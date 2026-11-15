@@ -6,9 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { DueDayField } from "@/components/form/due-day-field";
 import { TextAreaField, TextField } from "@/components/form/text-field";
-import { cancelClassName, FormDialog } from "@/components/ui/form-dialog";
 import {
-  inviteTeacher,
   updateInstitute,
   updateDueDays,
   uploadLogo,
@@ -17,7 +15,6 @@ import { t } from "@/lib/t";
 import type {
   DueDaysInput,
   InstituteInput,
-  InviteTeacherInput,
 } from "@/lib/validation/institute";
 
 export function InstituteForm({
@@ -183,73 +180,5 @@ export function LogoForm() {
         {pending ? t("Saving…") : t("Upload logo")}
       </Button>
     </form>
-  );
-}
-
-export function InviteTeacherForm() {
-  const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const form = useForm<InviteTeacherInput>({ defaultValues: { email: "" } });
-
-  async function onSubmit(values: InviteTeacherInput) {
-    setError(null);
-    setNotice(null);
-    setPending(true);
-    const result = await inviteTeacher(values);
-    setPending(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    setNotice(t("Invite sent"));
-    form.reset();
-    setOpen(false);
-  }
-
-  return (
-    <div>
-      <Button type="button" className="h-11" onClick={() => setOpen(true)}>
-        {t("Invite a teacher")}
-      </Button>
-      {notice ? <p className="mt-3 text-sm text-slate">{notice}</p> : null}
-      <FormDialog
-        open={open}
-        title={t("Invite a teacher")}
-        onOpenChange={(next) => {
-          setOpen(next);
-          if (!next) {
-            setError(null);
-            form.reset();
-          }
-        }}
-      >
-        {open ? (
-          <form className="flex flex-col gap-4" onSubmit={form.handleSubmit(onSubmit)}>
-            <TextField
-              label={t("Email")}
-              type="email"
-              autoComplete="email"
-              {...form.register("email")}
-            />
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
-            <div className="flex gap-3">
-              <button
-                type="button"
-                className={cancelClassName()}
-                disabled={pending}
-                onClick={() => setOpen(false)}
-              >
-                {t("Cancel")}
-              </button>
-              <Button type="submit" className="h-11 flex-1" disabled={pending}>
-                {pending ? t("Sending…") : t("Send invite")}
-              </Button>
-            </div>
-          </form>
-        ) : null}
-      </FormDialog>
-    </div>
   );
 }

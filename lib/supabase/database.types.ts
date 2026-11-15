@@ -123,6 +123,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      staff_members: {
+        Row: {
+          id: string;
+          institute_id: string;
+          profile_id: string | null;
+          full_name: string;
+          title: string | null;
+          phone: string | null;
+          email: string | null;
+          nic: string | null;
+          address: string | null;
+          subjects: string | null;
+          joined_on: string | null;
+          left_on: string | null;
+          notes: string | null;
+          status: string;
+          archived_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          institute_id: string;
+          profile_id?: string | null;
+          full_name: string;
+          title?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          nic?: string | null;
+          address?: string | null;
+          subjects?: string | null;
+          joined_on?: string | null;
+          left_on?: string | null;
+          notes?: string | null;
+          status?: string;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          institute_id?: string;
+          profile_id?: string | null;
+          full_name?: string;
+          title?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          nic?: string | null;
+          address?: string | null;
+          subjects?: string | null;
+          joined_on?: string | null;
+          left_on?: string | null;
+          notes?: string | null;
+          status?: string;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       activity_log: {
         Row: {
           id: string;
@@ -339,6 +399,9 @@ export type Database = {
           learning_mode: string | null;
           has_special_needs: boolean;
           special_needs: string | null;
+          left_on: string | null;
+          leave_reason: string | null;
+          leave_note: string | null;
           portal_enabled: boolean;
           status: string;
           archived_at: string | null;
@@ -384,6 +447,9 @@ export type Database = {
           learning_mode?: string | null;
           has_special_needs?: boolean;
           special_needs?: string | null;
+          left_on?: string | null;
+          leave_reason?: string | null;
+          leave_note?: string | null;
           portal_enabled?: boolean;
           status?: string;
           archived_at?: string | null;
@@ -429,6 +495,9 @@ export type Database = {
           learning_mode?: string | null;
           has_special_needs?: boolean;
           special_needs?: string | null;
+          left_on?: string | null;
+          leave_reason?: string | null;
+          leave_note?: string | null;
           portal_enabled?: boolean;
           status?: string;
           archived_at?: string | null;
@@ -445,6 +514,7 @@ export type Database = {
           student_id: string;
           start_date: string;
           end_date: string | null;
+          outcome: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -455,6 +525,7 @@ export type Database = {
           student_id: string;
           start_date: string;
           end_date?: string | null;
+          outcome?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -465,6 +536,7 @@ export type Database = {
           student_id?: string;
           start_date?: string;
           end_date?: string | null;
+          outcome?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -908,6 +980,44 @@ export type Database = {
       create_student: {
         Args: { p_data: Json; p_course_ids: string[]; p_start_date: string };
         Returns: string;
+      };
+      set_student_courses: {
+        Args: {
+          p_student_id: string;
+          p_course_ids: string[];
+          p_on?: string;
+          p_outcomes?: Json;
+        };
+        Returns: undefined;
+      };
+      mark_student_left: {
+        Args: {
+          p_student_id: string;
+          p_left_on: string;
+          p_reason?: string | null;
+          p_note?: string | null;
+        };
+        Returns: undefined;
+      };
+      grant_staff_login: {
+        Args: { p_staff_id: string; p_profile_id: string };
+        Returns: undefined;
+      };
+      archive_staff_member: {
+        Args: { p_staff_id: string; p_left_on?: string | null };
+        Returns: undefined;
+      };
+      restore_staff_member: {
+        Args: { p_staff_id: string };
+        Returns: undefined;
+      };
+      set_staff_courses: {
+        Args: { p_staff_id: string; p_course_ids: string[] };
+        Returns: undefined;
+      };
+      rejoin_student: {
+        Args: { p_student_id: string };
+        Returns: undefined;
       };
       has_permission: {
         Args: { p_permission: string };

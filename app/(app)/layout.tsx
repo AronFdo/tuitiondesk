@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AppShell, type ShellNavItem } from "@/components/app/app-shell";
 import { signedLogoUrl } from "@/lib/institute-logo";
 import { can } from "@/lib/permissions";
+import { createClient } from "@/lib/supabase/server";
 import { getParent, getStaff } from "@/lib/supabase/session";
 import { t } from "@/lib/t";
 
@@ -22,7 +23,15 @@ async function StaffFrame({
   const staff = await getStaff();
   if (!staff) {
     const parent = await getParent();
-    redirect(parent ? "/family" : "/sign-in");
+    if (parent) {
+      redirect("/family");
+    }
+    // Signed in but in no class: sign-in would send them straight back.
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    redirect(user ? "/no-access" : "/sign-in");
   }
 
   const logoUrl = await signedLogoUrl(staff.institute.logo_path);
@@ -41,6 +50,7 @@ async function StaffFrame({
         { href: "/attendance", label: t("Attendance") },
         { href: "/courses", label: t("Courses") },
         ...payments.map(({ href, label }) => ({ href, label })),
+        ...(can(staff, "staff.manage") ? [{ href: "/staff", label: t("Staff") }] : []),
       ]}
       bottomItems={[
         { href: "/students", label: t("Students"), icon: "students" },

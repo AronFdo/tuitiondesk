@@ -352,6 +352,16 @@ export async function inviteParent(input: InviteParentInput): Promise<ActionResu
   if (linkError && linkError.code !== "23505") {
     return { ok: false, error: t("That invite could not be sent.") };
   }
+  if (!linkError) {
+    await session.supabase.from("activity_log").insert({
+      institute_id: profile.active_institute_id,
+      actor_profile_id: session.userId,
+      action: "guardian_invited",
+      entity: "students",
+      entity_id: student.id,
+      data: { email },
+    });
+  }
 
   refresh();
   return { ok: true, data: undefined };

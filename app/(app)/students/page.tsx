@@ -5,16 +5,19 @@ import { StudentManager } from "@/components/courses/student-manager";
 import { loadStudentsPage } from "@/lib/students";
 import { t } from "@/lib/t";
 
-export default function StudentsPage() {
+type SearchParams = Promise<{ show?: string }>;
+
+export default function StudentsPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <Suspense fallback={<p className="text-slate">{t("Loading…")}</p>}>
-      <StudentList />
+      <StudentList searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function StudentList() {
-  const page = await loadStudentsPage();
+async function StudentList({ searchParams }: { searchParams: SearchParams }) {
+  const left = (await searchParams).show === "left";
+  const page = await loadStudentsPage({ left });
   if (page.status === "signed-out") {
     redirect("/sign-in");
   }
@@ -37,13 +40,17 @@ async function StudentList() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1>{t("Students")}</h1>
+          <h1>{left ? t("Students who left") : t("Students")}</h1>
           <p className="text-sm text-slate">
             {page.students.length === 1 ? t("1 student") : `${page.students.length} ${t("students")}`}
+            {" · "}
+            <Link href={left ? "/students" : "/students?show=left"} className="text-forest">
+              {left ? t("Back to current students") : t("Students who left")}
+            </Link>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {page.students.length > 0 ? (
+          {!left && page.students.length > 0 ? (
             <a
               href="/cards"
               target="_blank"
@@ -75,9 +82,11 @@ async function StudentList() {
         canEdit={page.canEdit}
         searchable
         empty={
-          page.canEdit
-            ? t("No students yet. Add one, or import a list from a spreadsheet.")
-            : t("No students yet.")
+          left
+            ? t("No one has left yet.")
+            : page.canEdit
+              ? t("No students yet. Add one, or import a list from a spreadsheet.")
+              : t("No students yet.")
         }
         students={page.students}
       />

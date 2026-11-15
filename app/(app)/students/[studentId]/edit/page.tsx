@@ -30,13 +30,28 @@ async function EditStudent({ params }: { params: Params }) {
   if (!/^[0-9a-f-]{36}$/i.test(studentId)) {
     return <p className="text-slate">{t("That student is not in this class.")}</p>;
   }
-  const { data, error } = await (await createClient())
-    .from("students")
-    .select(STUDENT_COLUMNS)
-    .eq("id", studentId)
-    .eq("institute_id", staff.institute.id)
-    .eq("status", "active")
-    .maybeSingle();
+  const supabase = await createClient();
+  const [{ data, error }, coursesResult, enrollmentsResult] = await Promise.all([
+    supabase
+      .from("students")
+      .select(STUDENT_COLUMNS)
+      .eq("id", studentId)
+      .eq("institute_id", staff.institute.id)
+      .eq("status", "active")
+      .maybeSingle(),
+    supabase
+      .from("courses")
+      .select("id, name")
+      .eq("institute_id", staff.institute.id)
+      .is("archived_at", null)
+      .order("name"),
+    supabase
+      .from("enrollments")
+      .select("course_id")
+      .eq("institute_id", staff.institute.id)
+      .eq("student_id", studentId)
+      .is("end_date", null),
+  ]);
   if (error) {
     return (
       <p className="max-w-md text-slate">
@@ -49,6 +64,11 @@ async function EditStudent({ params }: { params: Params }) {
   if (!data) {
     return <p className="text-slate">{t("That student is not in this class.")}</p>;
   }
+  // Without both lists the course picker could end courses by mistake, so
+  // it is left off and only the details are saved.
+  const courses =
+    coursesResult.error || enrollmentsResult.error ? undefined : (coursesResult.data ?? []);
+  const currentCourseIds = (enrollmentsResult.data ?? []).map((row) => row.course_id);
   const row = data as unknown as StudentRow;
 
   return (
@@ -59,7 +79,13 @@ async function EditStudent({ params }: { params: Params }) {
         </Link>
         <h1 className="mt-1">{t("Edit details")}</h1>
       </div>
-      <StudentForm studentId={studentId} defaults={studentInput(row)} cancelHref={back} />
+      <StudentForm
+        studentId={studentId}
+        defaults={studentInput(row)}
+        courses={courses}
+        initialCourseIds={currentCourseIds}
+        cancelHref={back}
+      />
     </div>
   );
 }

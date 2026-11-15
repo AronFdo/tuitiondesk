@@ -2,18 +2,14 @@
 
 import type { ActionResult } from "@/lib/action-result";
 import { normalizePhone } from "@/lib/phone";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getStaff } from "@/lib/supabase/session";
 import { createClient } from "@/lib/supabase/server";
-import { getRequestOrigin } from "@/lib/site";
 import { t } from "@/lib/t";
 import {
   instituteSchema,
-  inviteTeacherSchema,
   dueDaysSchema,
   type DueDaysInput,
   type InstituteInput,
-  type InviteTeacherInput,
 } from "@/lib/validation/institute";
 import { can } from "@/lib/permissions";
 
@@ -163,68 +159,6 @@ export async function uploadLogo(formData: FormData): Promise<ActionResult> {
 
   if (updateError) {
     return { ok: false, error: t("That logo could not be saved.") };
-  }
-
-  return { ok: true, data: undefined };
-}
-
-export async function inviteTeacher(
-  input: InviteTeacherInput,
-): Promise<ActionResult> {
-  const parsed = inviteTeacherSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: firstIssue(parsed.error.issues[0]?.message) };
-  }
-
-  const admin = await requireAdmin();
-  if (!admin.ok) {
-    return admin;
-  }
-
-  const origin = await getRequestOrigin();
-  if (!origin) {
-    return { ok: false, error: t("Something went wrong. Try again.") };
-  }
-
-  const adminClient = createAdminClient();
-  if (!adminClient.ok) {
-    return adminClient;
-  }
-
-  const { data, error } = await adminClient.client.auth.admin.inviteUserByEmail(
-    parsed.data.email,
-    { redirectTo: `${origin}/auth/callback?next=/accept-invite` },
-  );
-
-  if (error || !data.user) {
-    const message = error?.message.toLowerCase() ?? "";
-    if (message.includes("already")) {
-      return { ok: false, error: t("That email already has an account.") };
-    }
-    return { ok: false, error: t("That invite could not be sent.") };
-  }
-
-  const { error: profileError } = await adminClient.client.from("profiles").insert({
-    id: data.user.id,
-    email: parsed.data.email,
-    full_name: null,
-    active_institute_id: admin.staff.institute.id,
-  });
-
-  if (profileError) {
-    return { ok: false, error: t("That invite could not be sent.") };
-  }
-
-  const { error: membershipError } = await adminClient.client
-    .from("memberships")
-    .insert({
-      institute_id: admin.staff.institute.id,
-      profile_id: data.user.id,
-      role: "teacher",
-    });
-
-  if (membershipError) {
-    return { ok: false, error: t("That invite could not be sent.") };
   }
 
   return { ok: true, data: undefined };

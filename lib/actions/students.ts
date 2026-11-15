@@ -2,6 +2,7 @@
 
 import { refresh } from "next/cache";
 import type { ActionResult } from "@/lib/action-result";
+import { isCourseOutcome, isLeaveReason } from "@/lib/course-history";
 import { colomboToday } from "@/lib/dates";
 import { newCardToken } from "@/lib/student-card";
 import { studentColumns, studentRecord, studentSchema, type StudentInput } from "@/lib/student-fields";
@@ -45,6 +46,7 @@ async function logActivity(
     action,
     entity: "students",
     entity_id: entityId,
+    data: { actor_name: admin.staff.fullName },
   });
 }
 
@@ -280,18 +282,31 @@ export async function createStudent(input: {
     console.error("createStudent", error?.code, error?.message);
     return { ok: false, error: studentError(error, "That student could not be added. Check your connection and try again.") };
   }
-  await logActivity(admin, "student_created", data);
+  // The database logs the new student and their courses (025).
   refresh();
   return { ok: true, data: { studentId: data } };
 }
 
+// Save a student's record and, when courseIds is given, the courses they are
+// on: unticked courses end today, with the outcome given for each, and newly
+// ticked ones start today.
 export async function updateStudentDetails(input: {
   studentId: string;
   student: StudentInput;
+  courseIds?: string[];
+  outcomes?: Record<string, string>;
 }): Promise<ActionResult> {
   if (!uuid.test(input.studentId)) {
     return { ok: false, error: t("That student is not in this class.") };
   }
+  if (input.courseIds && !input.courseIds.every((id) => uuid.test(id))) {
+    return { ok: false, error: t("One of those courses was deleted. Refresh the page and choose again.") };
+  }
+  const outcomes = Object.fromEntries(
+    Object.entries(input.outcomes ?? {}).filter(
+      ([courseId, outcome]) => uuid.test(courseId) && isCourseOutcome(outcome),
+    ),
+  );
   const parsed = studentSchema.safeParse(input.student);
   if (!parsed.success) {
     return { ok: false, error: t(parsed.error.issues[0]?.message ?? "Check the form and try again.") };
@@ -312,7 +327,95 @@ export async function updateStudentDetails(input: {
     console.error("updateStudentDetails", error?.code, error?.message);
     return { ok: false, error: studentError(error, "That student could not be saved. Check your connection and try again.") };
   }
-  await logActivity(admin, "student_updated", data.id);
+  if (input.courseIds) {
+    const courses = await admin.supabase.rpc("set_student_courses", {
+      p_student_id: data.id,
+      p_course_ids: [...new Set(input.courseIds)],
+      p_on: colomboToday(),
+      p_outcomes: outcomes,
+    });
+    if (courses.error) {
+      console.error("updateStudentDetails courses", courses.error.code, courses.error.message);
+      refresh();
+      return {
+        ok: false,
+        error: courses.error.code === "PGRST202"
+          ? t("The details were saved, but changing courses is not set up yet. Run 027_course_history.sql in Supabase, then try again.")
+          : courses.error.message.includes("course not found")
+            ? t("The details were saved, but one of those courses was deleted. Refresh the page and choose again.")
+            : t("The details were saved, but the courses could not be changed. Try again."),
+      };
+    }
+  }
+  // The database logs what changed, field by field, and each course start
+  // and end (025).
+  refresh();
+  return { ok: true, data: undefined };
+}
+
+const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+
+// The student leaves the institute: every open course ends on that date and
+// they move off the class lists, but their record and history stay.
+export async function markStudentLeft(input: {
+  studentId: string;
+  leftOn: string;
+  reason: string;
+  note: string;
+}): Promise<ActionResult> {
+  if (!uuid.test(input.studentId)) {
+    return { ok: false, error: t("That student is not in this class.") };
+  }
+  if (!isoDate.test(input.leftOn) || input.leftOn > colomboToday()) {
+    return { ok: false, error: t("Choose the day they left. It cannot be in the future.") };
+  }
+  if (input.reason && !isLeaveReason(input.reason)) {
+    return { ok: false, error: t("Choose a reason from the list.") };
+  }
+  const note = input.note.trim();
+  if (note.length > 500) {
+    return { ok: false, error: t("Keep the note under 500 characters.") };
+  }
+  const admin = await requireAdmin();
+  if (!admin.ok) {
+    return admin;
+  }
+  const { error } = await admin.supabase.rpc("mark_student_left", {
+    p_student_id: input.studentId,
+    p_left_on: input.leftOn,
+    p_reason: input.reason || null,
+    p_note: note || null,
+  });
+  if (error) {
+    console.error("markStudentLeft", error.code, error.message);
+    return {
+      ok: false,
+      error: error.code === "PGRST202"
+        ? t("Leaving is not set up yet. Run 027_course_history.sql in Supabase, then try again.")
+        : error.message.includes("student not found")
+          ? t("That student has already left or is not in this class. Refresh the page.")
+          : t("That could not be saved. Check your connection and try again."),
+    };
+  }
+  refresh();
+  return { ok: true, data: undefined };
+}
+
+// Back on the class lists. Their old courses stay in their history; new ones
+// are added from the edit page.
+export async function rejoinStudent(input: { studentId: string }): Promise<ActionResult> {
+  if (!uuid.test(input.studentId)) {
+    return { ok: false, error: t("That student is not in this class.") };
+  }
+  const admin = await requireAdmin();
+  if (!admin.ok) {
+    return admin;
+  }
+  const { error } = await admin.supabase.rpc("rejoin_student", { p_student_id: input.studentId });
+  if (error) {
+    console.error("rejoinStudent", error.code, error.message);
+    return { ok: false, error: t("That could not be saved. Check your connection and try again.") };
+  }
   refresh();
   return { ok: true, data: undefined };
 }

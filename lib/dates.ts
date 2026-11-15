@@ -74,6 +74,16 @@ export function previousMonth(isoDate: string): string {
   return month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, "0")}`;
 }
 
+// The Sri Lanka calendar date of a timestamp, as YYYY-MM-DD.
+export function colomboDate(isoTimestamp: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Colombo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(isoTimestamp));
+}
+
 // "3:42 pm" in Sri Lanka time, whatever the device's time zone.
 export function formatTime(isoTimestamp: string): string {
   return new Intl.DateTimeFormat("en-GB", {

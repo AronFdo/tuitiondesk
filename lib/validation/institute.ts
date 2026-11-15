@@ -14,10 +14,5 @@ export const dueDaysSchema = z.object({
   tuitionDueDay: dueDay("Choose the day tuition fees are due."),
 });
 
-export const inviteTeacherSchema = z.object({
-  email: z.email("Enter a valid email."),
-});
-
 export type InstituteInput = z.infer<typeof instituteSchema>;
 export type DueDaysInput = z.infer<typeof dueDaysSchema>;
-export type InviteTeacherInput = z.infer<typeof inviteTeacherSchema>;

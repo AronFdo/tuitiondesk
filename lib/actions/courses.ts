@@ -247,13 +247,7 @@ export async function archiveStudent(input: {
     return { ok: false, error: t("That student could not be deleted. Check your connection and try again.") };
   }
 
-  await supabase.from("activity_log").insert({
-    institute_id: existing.data.institute_id,
-    action: "student_archived",
-    entity: "students",
-    entity_id: existing.data.id,
-  });
-
+  // The database logs the archive and each course it ended (025).
   refresh();
   return { ok: true, data: undefined };
 }

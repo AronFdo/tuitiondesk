@@ -13,6 +13,8 @@ const appPaths = [
   "/cards",
   "/attendance",
   "/receipts",
+  "/staff",
+  "/no-access",
 ];
 const guestOnlyPaths = ["/sign-in", "/sign-up"];
 const sessionPaths = ["/reset-password", "/accept-invite"];

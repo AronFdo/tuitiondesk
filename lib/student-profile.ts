@@ -1,3 +1,5 @@
+import { courseHistory, leaveReasonLabel, type CourseHistoryItem } from "@/lib/course-history";
+import { colomboToday } from "@/lib/dates";
 import { receiptsForPayments } from "@/lib/receipts";
 import { STUDENT_COLUMNS, type StudentRow } from "@/lib/student-fields";
 import { cardPayload } from "@/lib/student-card";
@@ -9,10 +11,17 @@ import { getStaff } from "@/lib/supabase/session";
 import { can } from "@/lib/permissions";
 
 export type StudentProfile = {
+  // Editing is for active students; a student who left can only rejoin.
   canEdit: boolean;
+  canRejoin: boolean;
+  // Set when the student has left the institute.
+  left: { on: string; reason: string | null; note: string | null } | null;
+  // Every course they have been on, current ones first.
+  history: CourseHistoryItem[];
   canViewFees: boolean;
   canViewDocuments: boolean;
   canInviteParent: boolean;
+  canViewHistory: boolean;
   student: {
     id: string;
     fullName: string;
@@ -79,47 +88,66 @@ export async function loadStudentProfile(studentId: string): Promise<
     supabase
       .from("students")
       .select(
-        `id, student_code, qr_token, qr_issued_at, photo_path, status, ${STUDENT_COLUMNS}`,
+        `id, student_code, qr_token, qr_issued_at, photo_path, status, left_on, leave_reason, leave_note, ${STUDENT_COLUMNS}`,
       )
       .eq("id", studentId)
       .eq("institute_id", instituteId)
       .maybeSingle(),
     supabase
       .from("enrollments")
-      .select("course_id, start_date")
+      .select("id, course_id, start_date, end_date, outcome")
       .eq("institute_id", instituteId)
-      .eq("student_id", studentId)
-      .is("end_date", null),
+      .eq("student_id", studentId),
   ]);
   const firstError = studentResult.error ?? enrollmentsResult.error;
   if (firstError) {
     return { status: "error", missing: missingTable(firstError) };
   }
   const student = studentResult.data;
-  if (!student || student.status !== "active") {
+  if (!student || (student.status !== "active" && student.status !== "left")) {
     return { status: "not-found" };
   }
+  const enrollments = enrollmentsResult.data ?? [];
+  const everCourseIds = [...new Set(enrollments.map((row) => row.course_id))];
 
-  const [facts, photos, cardSvg] = await Promise.all([
+  const [facts, photos, cardSvg, namesResult] = await Promise.all([
     loadStudentFacts(supabase, instituteId, [student.id], canViewFees),
     signedPhotoUrls(supabase, [student.photo_path]),
     qrSvg(cardPayload(student.qr_token)),
+    // Archived courses too, so old courses keep their names.
+    everCourseIds.length === 0
+      ? Promise.resolve({ data: [], error: null })
+      : supabase.from("courses").select("id, name").in("id", everCourseIds),
   ]);
   if (!facts.ok) {
     return { status: "error", missing: facts.missing };
   }
   const detail = facts.byStudent.get(student.id);
   const startDates = new Map(
-    (enrollmentsResult.data ?? []).map((row) => [row.course_id, row.start_date]),
+    enrollments.filter((row) => row.end_date === null).map((row) => [row.course_id, row.start_date]),
   );
+  const courseNames = new Map((namesResult.data ?? []).map((row) => [row.id, row.name]));
+  const active = student.status === "active";
+  const manage = can(staff, "students.manage");
 
   return {
     status: "ready",
     profile: {
-      canEdit: can(staff, "students.manage"),
+      canEdit: manage && active,
+      canRejoin: manage && !active,
+      left:
+        !active && student.left_on
+          ? {
+              on: student.left_on,
+              reason: leaveReasonLabel(student.leave_reason),
+              note: student.leave_note,
+            }
+          : null,
+      history: courseHistory(enrollments, courseNames, colomboToday()),
       canViewFees,
       canViewDocuments: can(staff, "students.documents"),
-      canInviteParent: can(staff, "parents.invite"),
+      canInviteParent: active && can(staff, "parents.invite"),
+      canViewHistory: can(staff, "students.history"),
       student: {
         id: student.id,
         fullName: student.full_name,

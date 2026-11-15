@@ -28,7 +28,8 @@ function missingTable(error: { code?: string; message: string }) {
   );
 }
 
-export async function loadStudentsPage(): Promise<
+// The class list, or with left set, the students who have left the institute.
+export async function loadStudentsPage({ left = false }: { left?: boolean } = {}): Promise<
   | { status: "signed-out" }
   | { status: "error"; missing: boolean }
   | { status: "ready"; canEdit: boolean; students: ClassStudent[] }
@@ -45,7 +46,7 @@ export async function loadStudentsPage(): Promise<
       "id, full_name, student_code, photo_path, date_of_birth, gender, guardian_name, guardian_phone, notes",
     )
     .eq("institute_id", staff.institute.id)
-    .eq("status", "active")
+    .eq("status", left ? "left" : "active")
     .order("full_name");
 
   if (studentsResult.error) {
@@ -71,7 +72,7 @@ export async function loadStudentsPage(): Promise<
 
   return {
     status: "ready",
-    canEdit: can(staff, "students.manage"),
+    canEdit: !left && can(staff, "students.manage"),
     students: students.map((student) => {
       const detail = facts.byStudent.get(student.id);
       return {

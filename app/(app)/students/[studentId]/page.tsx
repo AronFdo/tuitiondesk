@@ -9,10 +9,11 @@ import { DocumentList } from "@/components/students/documents";
 import { StudentPhoto } from "@/components/students/student-photo";
 import { UploadDocumentButton } from "@/components/students/upload-document-button";
 import { loadStudentAttendance } from "@/lib/attendance";
-import { formatDate, formatMonth } from "@/lib/dates";
+import { colomboDate, formatDate, formatMonth, formatTime } from "@/lib/dates";
 import { formatLkr } from "@/lib/money";
 import { UPLOAD_DOCUMENT_KINDS } from "@/lib/document-kinds";
 import { loadStudentDocuments } from "@/lib/student-documents";
+import { loadStudentHistory } from "@/lib/student-history";
 import { formatReceiptNo } from "@/lib/receipt-format";
 import { learningModeLabel, mediumLabel } from "@/lib/student-fields";
 import { loadStudentFees, loadStudentProfile, type StudentProfile } from "@/lib/student-profile";
@@ -23,6 +24,7 @@ const TABS = [
   { key: "attendance", label: "Attendance" },
   { key: "fees", label: "Fees" },
   { key: "documents", label: "Documents" },
+  { key: "history", label: "History" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -63,7 +65,7 @@ async function Profile({ params, searchParams }: { params: Params; searchParams:
     return (
       <p className="max-w-md text-slate">
         {result.missing
-          ? t("Student cards are not set up yet. Run 018_student_identity.sql in Supabase, then refresh.")
+          ? t("This page needs the latest SQL. Run the files in supabase/sql up to 027_course_history.sql in Supabase, then refresh.")
           : t("This student could not be loaded. Refresh the page to try again.")}
       </p>
     );
@@ -71,11 +73,12 @@ async function Profile({ params, searchParams }: { params: Params; searchParams:
 
   const { profile } = result;
   const { student } = profile;
-  // Fees and ID documents show only to staff allowed to see them.
+  // Fees, ID documents and the change log show only to staff allowed to see them.
   const tabs = TABS.filter(
     (item) =>
       (item.key !== "fees" || profile.canViewFees) &&
-      (item.key !== "documents" || profile.canViewDocuments),
+      (item.key !== "documents" || profile.canViewDocuments) &&
+      (item.key !== "history" || profile.canViewHistory),
   );
   const active: TabKey = tabs.some((item) => item.key === tab) ? (tab as TabKey) : "overview";
 
@@ -109,6 +112,7 @@ async function Profile({ params, searchParams }: { params: Params; searchParams:
           <div className="mt-2">
             <StudentActions
               canEdit={profile.canEdit}
+              canRejoin={profile.canRejoin}
               student={{
                 id: student.id,
                 fullName: student.fullName,
@@ -136,6 +140,22 @@ async function Profile({ params, searchParams }: { params: Params; searchParams:
         </figure>
       </header>
 
+      {profile.left ? (
+        <section
+          aria-label={t("Left the institute")}
+          className="rounded-lg border border-line bg-surface p-4"
+        >
+          <p className="font-medium text-ink">
+            {`${t("Left the institute on")} ${formatDate(profile.left.on)}`}
+          </p>
+          {profile.left.reason || profile.left.note ? (
+            <p className="mt-1 whitespace-pre-line break-words text-slate">
+              {[profile.left.reason, profile.left.note].filter(Boolean).join(" · ")}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
       {tabs.length > 1 ? (
         <nav
           className="-mx-4 flex overflow-x-auto border-b border-line px-4 md:mx-0 md:px-0"
@@ -162,6 +182,7 @@ async function Profile({ params, searchParams }: { params: Params; searchParams:
         {active === "attendance" ? <Attendance studentId={student.id} /> : null}
         {active === "fees" ? <Fees profile={profile} /> : null}
         {active === "documents" ? <Documents studentId={student.id} /> : null}
+        {active === "history" ? <History studentId={student.id} /> : null}
       </Suspense>
     </div>
   );
@@ -264,6 +285,27 @@ function Overview({ profile }: { profile: StudentProfile }) {
           </section>
         );
       })}
+      {profile.history.length > 0 ? (
+        <section>
+          <h2>{t("Course history")}</h2>
+          <ol className="mt-2">
+            {profile.history.map((item) => (
+              <li key={item.id} className="border-b border-line py-3">
+                <p className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                  <Link href={`/courses/${item.courseId}`} className="min-w-0 break-words text-forest">
+                    {item.courseName}
+                  </Link>
+                  <span className={`text-sm ${item.current ? "font-medium text-forest" : "text-slate"}`}>
+                    {item.current ? t("Current") : item.outcome}
+                  </span>
+                </p>
+                <p className="tabular mt-0.5 text-sm text-slate">{`${item.dates} · ${item.duration}`}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+      {profile.left ? null : (
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <GuardianReminder
           fullName={student.fullName}
@@ -273,6 +315,7 @@ function Overview({ profile }: { profile: StudentProfile }) {
         />
         {profile.canInviteParent ? <InviteParentButton studentId={student.id} /> : null}
       </div>
+      )}
     </div>
   );
 }
@@ -402,6 +445,61 @@ async function Documents({ studentId }: { studentId: string }) {
         documents={result.documents}
         empty={t("No documents yet. Upload a copy of the NIC, passport or birth certificate.")}
       />
+    </section>
+  );
+}
+
+async function History({ studentId }: { studentId: string }) {
+  const result = await loadStudentHistory(studentId);
+  if (result.status !== "ready") {
+    return (
+      <p className="max-w-md text-slate">
+        {result.status === "error" && result.missing
+          ? t("History is not set up yet. Run 025_student_history.sql in Supabase, then refresh.")
+          : t("History could not be loaded. Refresh the page to try again.")}
+      </p>
+    );
+  }
+  if (result.entries.length === 0) {
+    return <p className="text-slate">{t("No changes recorded yet.")}</p>;
+  }
+  return (
+    <section className="max-w-2xl">
+      <h2 className="sr-only">{t("History")}</h2>
+      <ol className="flex flex-col">
+        {result.entries.map((entry) => (
+          <li key={entry.id} className="border-b border-line py-4 first:pt-0">
+            <p className="text-ink">
+              <span className="font-medium">{entry.title}</span>
+              {entry.detail ? <span className="break-words text-slate">{` · ${entry.detail}`}</span> : null}
+            </p>
+            <p className="mt-0.5 text-sm text-slate">
+              {entry.actorName} ·{" "}
+              <time dateTime={entry.at} className="tabular">
+                {`${formatDate(colomboDate(entry.at))}, ${formatTime(entry.at)}`}
+              </time>
+            </p>
+            {entry.changes.length > 0 ? (
+              <dl className="mt-3 flex flex-col gap-2">
+                {entry.changes.map((change) => (
+                  <div key={change.label} className="text-sm">
+                    <dt className="text-slate">{change.label}</dt>
+                    <dd className="break-words text-ink">
+                      <del className="text-slate">{change.from}</del>
+                      <span aria-hidden="true">{" → "}</span>
+                      <span className="sr-only">{` ${t("changed to")} `}</span>
+                      <ins className="no-underline">{change.to}</ins>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+      {result.more ? (
+        <p className="mt-4 text-sm text-slate">{t("Showing the latest 200 changes.")}</p>
+      ) : null}
     </section>
   );
 }

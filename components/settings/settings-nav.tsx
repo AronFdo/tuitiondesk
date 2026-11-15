@@ -6,7 +6,7 @@ export const settingsSections = [
   { id: "days", label: t("Fee due dates") },
   { id: "receipts", label: t("Receipts") },
   { id: "logo", label: t("Logo") },
-  { id: "teachers", label: t("Invite a teacher") },
+  { id: "teachers", label: t("Staff and logins") },
 ] as const;
 
 export type SettingsSection = (typeof settingsSections)[number]["id"];

@@ -1,8 +1,8 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import {
   InstituteForm,
-  InviteTeacherForm,
   LogoForm,
   DueDaysForm,
 } from "@/components/settings/institute-forms";
@@ -85,7 +85,20 @@ function AdminPanel({
     return <LogoForm />;
   }
   if (section === "teachers") {
-    return <InviteTeacherForm />;
+    return (
+      <div className="max-w-md">
+        <h2>{t("Staff and logins")}</h2>
+        <p className="mt-2 text-slate">
+          {t("Add teachers and other staff, give them a login, and choose the courses they teach from the Staff page.")}
+        </p>
+        <Link
+          href="/staff"
+          className="press mt-4 inline-flex h-11 items-center justify-center rounded-lg bg-forest px-4 text-sm font-medium text-white"
+        >
+          {t("Open Staff")}
+        </Link>
+      </div>
+    );
   }
   return <InstituteForm institute={institute} />;
 }

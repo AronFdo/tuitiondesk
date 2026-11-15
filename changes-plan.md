@@ -1,6 +1,6 @@
 # TuitionDesk change set: notifications, course history, staff, change log, RBAC
 
-Status: planned 2026-11-15. S1 built 2026-11-15 (024_permissions.sql). Builds on `pivot-plan.md` (numbered SQL in `supabase/sql/`). Next migration number is **025**.
+Status: planned 2026-11-15. S1 built 2026-11-15 (024_permissions.sql). S2 built 2026-11-16 (025_student_history.sql). S3 built 2026-11-16 (026_student_courses.sql, 027_course_history.sql). S4 built 2026-11-16 (028_staff.sql). Builds on `pivot-plan.md` (numbered SQL in `supabase/sql/`). Next migration number is **029**.
 
 ## Requested changes
 
@@ -47,7 +47,7 @@ S1–S4 don't depend on each other's outcomes and can ship one at a time. S6 nee
 ### S3: Course progression and students leaving
 
 - `enrollments.outcome`: `completed | promoted | withdrawn | left` (null while open).
-- RPC `move_student_to_course(student, from_course, to_course, on_date)` ends the current enrolment and opens the next one on the same date, in one transaction.
+- ~~RPC `move_student_to_course`~~ Done 2026-11-16 as `set_student_courses` (026): the student edit page has course checkboxes; unticked courses end today and newly ticked ones start today, in one transaction. Still to add: `outcome` on the ended enrolment.
 - "Course history" section on the student profile: every enrolment with dates, duration, and outcome.
 - Leaving the institute: `students.left_on`, `students.leave_reason`; a `mark_student_left` RPC closes all open enrolments with outcome `left` and emits a `student.left` event (sent in S5/S6).
 

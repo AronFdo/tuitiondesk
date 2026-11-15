@@ -17,6 +17,7 @@ import {
   studentSchema,
   type StudentInput,
 } from "@/lib/student-fields";
+import { COURSE_OUTCOMES } from "@/lib/course-history";
 import { t } from "@/lib/t";
 
 // The full student record, on its own page: too many fields for a sheet.
@@ -32,7 +33,8 @@ export function StudentForm({
   // Set when editing; adding otherwise.
   studentId?: string;
   defaults?: StudentInput;
-  // Courses to put a new student on. Not shown when editing.
+  // Courses to tick. When adding, the new student starts on them; when
+  // editing, unticked courses end today and newly ticked ones start today.
   courses?: { id: string; name: string }[];
   initialCourseIds?: string[];
   cancelHref: string;
@@ -41,6 +43,13 @@ export function StudentForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [courseIds, setCourseIds] = useState<string[]>(initialCourseIds);
+  // Why each course the student was on is ending, for courses unticked here.
+  const [outcomes, setOutcomes] = useState<Record<string, string>>({});
+  const ending = studentId
+    ? (courses ?? []).filter(
+        (course) => initialCourseIds.includes(course.id) && !courseIds.includes(course.id),
+      )
+    : [];
   const saving = useRef(false);
   const form = useForm<StudentInput>({ defaultValues: defaults ?? emptyStudent });
   const {
@@ -73,7 +82,16 @@ export function StudentForm({
     setError(null);
     setPending(true);
     const result = studentId
-      ? await updateStudentDetails({ studentId, student: values }).catch(() => null)
+      ? await updateStudentDetails({
+          studentId,
+          student: values,
+          courseIds: courses ? courseIds : undefined,
+          outcomes: Object.fromEntries(
+            ending
+              .map((course) => [course.id, outcomes[course.id] ?? ""] as const)
+              .filter(([, outcome]) => outcome),
+          ),
+        }).catch(() => null)
       : await createStudent({ student: values, courseIds }).catch(() => null);
     saving.current = false;
     setPending(false);
@@ -161,6 +179,11 @@ export function StudentForm({
         {courses && courses.length > 0 ? (
           <fieldset className="sm:col-span-2">
             <legend className="text-sm font-medium text-ink">{t("Courses")}</legend>
+            {studentId ? (
+              <p className="mt-1 text-sm text-slate">
+                {t("Untick a course to end it today. Tick a new one to start it today. Past courses stay in the student's history.")}
+              </p>
+            ) : null}
             <div className="mt-2 grid gap-x-6 sm:grid-cols-2">
               {courses.map((course) => (
                 <label key={course.id} className="flex min-h-11 items-center gap-3 text-ink">
@@ -178,6 +201,28 @@ export function StudentForm({
                 </label>
               ))}
             </div>
+            {ending.length > 0 ? (
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                {ending.map((course) => (
+                  <SelectField
+                    key={course.id}
+                    id={`ending-${course.id}`}
+                    label={`${t("Why is")} ${course.name} ${t("ending?")}`}
+                    value={outcomes[course.id] ?? ""}
+                    onChange={(event) =>
+                      setOutcomes((current) => ({ ...current, [course.id]: event.target.value }))
+                    }
+                  >
+                    <option value="">{t("Not given")}</option>
+                    {COURSE_OUTCOMES.map((outcome) => (
+                      <option key={outcome.value} value={outcome.value}>
+                        {t(outcome.label)}
+                      </option>
+                    ))}
+                  </SelectField>
+                ))}
+              </div>
+            ) : null}
           </fieldset>
         ) : null}
       </Section>

@@ -1,4 +1,12 @@
-import { COURSE_COLUMNS, courseForm, loadTeacherOptions, type TeacherOption } from "@/lib/class-courses";
+import {
+  COURSE_COLUMNS,
+  courseForm,
+  loadTeacherOptions,
+  withCourseFee,
+  type TeacherOption,
+} from "@/lib/class-courses";
+import { loadCourseFees } from "@/lib/course-fees";
+import { can } from "@/lib/permissions";
 import { loadStudentFacts, type LastTuition, type NextDue } from "@/lib/student-context";
 import { createClient } from "@/lib/supabase/server";
 import { getStaff, type StaffContext } from "@/lib/supabase/session";
@@ -26,6 +34,7 @@ function missingTable(error: { code?: string; message: string }) {
     error.code === "PGRST205" ||
     error.code === "42P01" ||
     error.code === "42703" ||
+    error.code === "PGRST202" ||
     error.message.includes("schema cache")
   );
 }
@@ -74,28 +83,35 @@ export async function loadCourse(courseId: string): Promise<
   if (courseResult.error) {
     return { status: "error", missing: missingTable(courseResult.error) };
   }
-  const course = courseResult.data;
+  const row = courseResult.data;
   if (
-    !course ||
-    (staff.role === "teacher" && course.teacher_profile_id !== staff.userId)
+    !row ||
+    (!can(staff, "courses.all") && row.teacher_profile_id !== staff.userId)
   ) {
     return { status: "missing" };
   }
 
-  const isAdmin = staff.role === "admin";
-  const [enrollmentResult, filesResult, teachers] = await Promise.all([
+  const canViewFees = can(staff, "fees.view");
+  const [enrollmentResult, filesResult, teachers, fees] = await Promise.all([
     supabase
       .from("enrollments")
       .select("student_id, start_date")
-      .eq("course_id", course.id)
+      .eq("course_id", row.id)
       .is("end_date", null),
     supabase
       .from("course_files")
       .select("id, kind, file_name, size_bytes")
-      .eq("course_id", course.id)
+      .eq("course_id", row.id)
       .order("file_name"),
-    isAdmin ? loadTeacherOptions(staff.institute.id) : Promise.resolve([]),
+    can(staff, "courses.manage")
+      ? loadTeacherOptions(staff.institute.id)
+      : Promise.resolve([]),
+    canViewFees ? loadCourseFees(supabase, [row.id]) : null,
   ]);
+  if (fees && !fees.ok) {
+    return { status: "error", missing: missingTable(fees.error) };
+  }
+  const course = withCourseFee(row, fees?.fees ?? null);
 
   if (enrollmentResult.error) {
     return { status: "error", missing: missingTable(enrollmentResult.error) };
@@ -135,7 +151,7 @@ export async function loadCourse(courseId: string): Promise<
       supabase,
       staff.institute.id,
       (studentsResult.data ?? []).map((student) => student.id),
-      isAdmin,
+      canViewFees,
     ),
     signedPhotoUrls(
       supabase,

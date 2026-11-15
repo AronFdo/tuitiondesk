@@ -909,6 +909,18 @@ export type Database = {
         Args: { p_data: Json; p_course_ids: string[]; p_start_date: string };
         Returns: string;
       };
+      has_permission: {
+        Args: { p_permission: string };
+        Returns: boolean;
+      };
+      course_fees: {
+        Args: { p_course_ids: string[] };
+        Returns: {
+          course_id: string;
+          monthly_fee_minor: number;
+          tuition_due_day: number | null;
+        }[];
+      };
     };
   };
 };

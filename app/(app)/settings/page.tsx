@@ -17,6 +17,7 @@ import { loadDueDays } from "@/lib/due-days";
 import { createClient } from "@/lib/supabase/server";
 import { getStaff } from "@/lib/supabase/session";
 import { t } from "@/lib/t";
+import { can } from "@/lib/permissions";
 
 export default function SettingsPage({
   searchParams,
@@ -41,7 +42,7 @@ async function Settings({
   }
 
   const section = settingsSection((await searchParams).section);
-  const admin = staff.role === "admin";
+  const admin = can(staff, "institute.manage");
   const sections = admin ? settingsSections : settingsSections.slice(0, 1);
 
   return (

@@ -7,6 +7,7 @@ import { parseCardPayload } from "@/lib/student-card";
 import { createClient } from "@/lib/supabase/server";
 import { getStaff } from "@/lib/supabase/session";
 import { t } from "@/lib/t";
+import { can } from "@/lib/permissions";
 
 const uuid = /^[0-9a-f-]{36}$/i;
 
@@ -15,7 +16,7 @@ async function requireAdmin() {
   if (!staff) {
     return { ok: false as const, error: t("Sign in to continue.") };
   }
-  if (staff.role !== "admin") {
+  if (!can(staff, "fees.record")) {
     return { ok: false as const, error: t("Only the class owner can do that.") };
   }
   return { ok: true as const, staff, supabase: await createClient() };

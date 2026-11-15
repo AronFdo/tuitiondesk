@@ -5,6 +5,7 @@ import { StudentForm } from "@/components/students/student-form";
 import { createClient } from "@/lib/supabase/server";
 import { getStaff } from "@/lib/supabase/session";
 import { t } from "@/lib/t";
+import { can } from "@/lib/permissions";
 
 type SearchParams = Promise<{ course?: string }>;
 
@@ -30,7 +31,7 @@ async function NewStudent({ searchParams }: { searchParams: SearchParams }) {
       <h1 className="mt-1">{t("Add a student")}</h1>
     </div>
   );
-  if (staff.role !== "admin") {
+  if (!can(staff, "students.manage")) {
     return (
       <div className="flex flex-col gap-4">
         {header}

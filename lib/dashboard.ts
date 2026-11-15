@@ -1,4 +1,6 @@
+import { loadCourseFees } from "@/lib/course-fees";
 import { colomboToday, previousMonth } from "@/lib/dates";
+import { can } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { getStaff, type StaffContext } from "@/lib/supabase/session";
 
@@ -49,7 +51,7 @@ export async function loadDashboard(): Promise<
       .eq("status", "active"),
     supabase
       .from("courses")
-      .select("id, name, monthly_fee_minor")
+      .select("id, name")
       .eq("institute_id", staff.institute.id)
       .is("archived_at", null),
     supabase
@@ -62,11 +64,11 @@ export async function loadDashboard(): Promise<
   const today = colomboToday();
   const monthStart = `${today.slice(0, 7)}-01`;
   const lastMonthStart = `${previousMonth(today)}-01`;
-  const isAdmin = staff.role === "admin";
+  const canViewFees = can(staff, "fees.view");
   const [overdueResult, tuitionResult, lastMonthPaidResult, sessionsResult] =
     await Promise.all([
-    isAdmin ? supabase.rpc("overdue_tuition_minor", { p_today: today }) : null,
-    isAdmin
+    canViewFees ? supabase.rpc("overdue_tuition_minor", { p_today: today }) : null,
+    canViewFees
       ? supabase
           .from("tuition_payments")
           .select("amount_minor")
@@ -74,7 +76,7 @@ export async function loadDashboard(): Promise<
           .is("voided_at", null)
           .gte("paid_on", monthStart)
       : null,
-    isAdmin
+    canViewFees
       ? supabase
           .from("tuition_payments")
           .select("student_id, course_id, amount_minor")
@@ -110,13 +112,23 @@ export async function loadDashboard(): Promise<
     }
   }
 
-  const fees = new Map(
-    (coursesResult.data ?? []).map((course) => [course.id, course.monthly_fee_minor]),
-  );
+  const courseFees = canViewFees
+    ? await loadCourseFees(
+        supabase,
+        (coursesResult.data ?? []).map((course) => course.id),
+      )
+    : null;
+  const fees = new Map<string, number>();
+  if (courseFees?.ok) {
+    for (const [id, fee] of courseFees.fees) {
+      fees.set(id, fee.monthlyFeeMinor);
+    }
+  }
   // Tuition is paid in arrears, so what is expected now is last month's fee
   // for each enrollment that had started by then, less what was paid for it.
   let expectedFeesMinor: number | null = null;
-  if (lastMonthPaidResult && !lastMonthPaidResult.error) {
+  // Without fees the total would read as zero, so it stays unknown.
+  if (courseFees?.ok && lastMonthPaidResult && !lastMonthPaidResult.error) {
     const paid = new Map<string, number>();
     for (const row of lastMonthPaidResult.data ?? []) {
       const key = `${row.student_id}:${row.course_id}`;

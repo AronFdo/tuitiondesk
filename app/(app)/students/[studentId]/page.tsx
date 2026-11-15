@@ -71,11 +71,12 @@ async function Profile({ params, searchParams }: { params: Params; searchParams:
 
   const { profile } = result;
   const { student } = profile;
-  // Teachers see the overview and attendance; fees and ID documents are the
-  // class owner's.
-  const tabs = profile.canEdit
-    ? TABS
-    : TABS.filter((item) => item.key === "overview" || item.key === "attendance");
+  // Fees and ID documents show only to staff allowed to see them.
+  const tabs = TABS.filter(
+    (item) =>
+      (item.key !== "fees" || profile.canViewFees) &&
+      (item.key !== "documents" || profile.canViewDocuments),
+  );
   const active: TabKey = tabs.some((item) => item.key === tab) ? (tab as TabKey) : "overview";
 
   return (
@@ -270,7 +271,7 @@ function Overview({ profile }: { profile: StudentProfile }) {
           guardianPhone={student.guardianPhone}
           nextDue={profile.nextDue}
         />
-        {profile.canEdit ? <InviteParentButton studentId={student.id} /> : null}
+        {profile.canInviteParent ? <InviteParentButton studentId={student.id} /> : null}
       </div>
     </div>
   );

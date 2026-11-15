@@ -10,6 +10,7 @@ import {
   tuitionPaymentSchema,
   type TuitionPaymentInput,
 } from "@/lib/validation/fees";
+import { can } from "@/lib/permissions";
 
 function firstIssue(message: string | undefined) {
   return t(message ?? "Check the form and try again.");
@@ -45,7 +46,7 @@ async function requireAdmin() {
     .eq("profile_id", session.userId)
     .eq("institute_id", profile.active_institute_id)
     .maybeSingle();
-  if (membership?.role !== "admin") {
+  if (!can(membership, "fees.record")) {
     return {
       ok: false as const,
       error: t("Only the class owner can do that."),

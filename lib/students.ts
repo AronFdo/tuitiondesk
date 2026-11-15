@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getStaff } from "@/lib/supabase/session";
 import { signedPhotoUrls } from "@/lib/student-photos";
 import { loadStudentFacts, type LastTuition, type NextDue } from "@/lib/student-context";
+import { can } from "@/lib/permissions";
 
 export type ClassStudent = {
   id: string;
@@ -57,7 +58,7 @@ export async function loadStudentsPage(): Promise<
       supabase,
       staff.institute.id,
       students.map((student) => student.id),
-      staff.role === "admin",
+      can(staff, "fees.view"),
     ),
     signedPhotoUrls(
       supabase,
@@ -70,7 +71,7 @@ export async function loadStudentsPage(): Promise<
 
   return {
     status: "ready",
-    canEdit: staff.role === "admin",
+    canEdit: can(staff, "students.manage"),
     students: students.map((student) => {
       const detail = facts.byStudent.get(student.id);
       return {

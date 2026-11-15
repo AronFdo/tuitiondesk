@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getStaff } from "@/lib/supabase/session";
 import type { DocumentKind, StudentDocument } from "@/lib/document-kinds";
+import { can } from "@/lib/permissions";
 
 // Copies of a student's papers, kept in a private bucket only the class owner
 // can read.
@@ -9,7 +10,7 @@ export async function loadStudentDocuments(studentId: string): Promise<
   { status: "forbidden" } | { status: "error" } | { status: "ready"; documents: StudentDocument[] }
 > {
   const staff = await getStaff();
-  if (!staff || staff.role !== "admin" || !/^[0-9a-f-]{36}$/i.test(studentId)) {
+  if (!staff || !can(staff, "students.documents") || !/^[0-9a-f-]{36}$/i.test(studentId)) {
     return { status: "forbidden" };
   }
   const supabase = await createClient();

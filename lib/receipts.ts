@@ -2,6 +2,7 @@ import { signedLogoUrl } from "@/lib/institute-logo";
 import { paperWidth, type PaperWidth } from "@/lib/receipt-format";
 import { createClient } from "@/lib/supabase/server";
 import { getStaff } from "@/lib/supabase/session";
+import { can } from "@/lib/permissions";
 
 export type ReceiptView = {
   id: string;
@@ -46,7 +47,7 @@ export async function loadReceipt(receiptId: string): Promise<
   if (!staff) {
     return { status: "signed-out" };
   }
-  if (staff.role !== "admin") {
+  if (!can(staff, "fees.view")) {
     return { status: "forbidden" };
   }
   if (!isUuid(receiptId)) {

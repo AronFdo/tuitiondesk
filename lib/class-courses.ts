@@ -1,4 +1,6 @@
+import { loadCourseFees, type CourseFee } from "@/lib/course-fees";
 import { minorToLkrInput } from "@/lib/money";
+import { can } from "@/lib/permissions";
 import { parseSchedule } from "@/lib/schedule";
 import { createClient } from "@/lib/supabase/server";
 import { getStaff, type StaffContext } from "@/lib/supabase/session";
@@ -18,8 +20,23 @@ export type CourseListItem = {
 
 export type TeacherOption = { id: string; name: string };
 
+// Fees are not in here: they are read through loadCourseFees, and only by
+// staff with fees.view.
 export const COURSE_COLUMNS =
-  "id, name, level, teacher_profile_id, schedule_text, monthly_fee_minor, tuition_due_day, description";
+  "id, name, level, teacher_profile_id, schedule_text, description";
+
+// A course row with its fee, or no fee for someone who may not see fees.
+export function withCourseFee<T extends { id: string }>(
+  course: T,
+  fees: Map<string, CourseFee> | null,
+): T & { monthly_fee_minor: number; tuition_due_day: number | null } {
+  const fee = fees?.get(course.id);
+  return {
+    ...course,
+    monthly_fee_minor: fee?.monthlyFeeMinor ?? 0,
+    tuition_due_day: fee?.tuitionDueDay ?? null,
+  };
+}
 
 type CourseFormRow = {
   name: string;
@@ -52,6 +69,7 @@ function missingTable(error: { code?: string; message: string }) {
   return (
     error.code === "PGRST205" ||
     error.code === "42P01" ||
+    error.code === "PGRST202" ||
     error.message.includes("schema cache")
   );
 }
@@ -85,12 +103,11 @@ export async function loadCoursesPage(): Promise<
 
   const visible = (coursesResult.data ?? []).filter(
     (course) =>
-      staff.role === "admin" || course.teacher_profile_id === staff.userId,
+      can(staff, "courses.all") || course.teacher_profile_id === staff.userId,
   );
   const courseIds = visible.map((course) => course.id);
-  const isAdmin = staff.role === "admin";
 
-  const [enrollmentResult, teachers] = await Promise.all([
+  const [enrollmentResult, teachers, fees] = await Promise.all([
     courseIds.length === 0
       ? Promise.resolve({ data: [], error: null })
       : supabase
@@ -98,11 +115,17 @@ export async function loadCoursesPage(): Promise<
           .select("course_id")
           .in("course_id", courseIds)
           .is("end_date", null),
-    isAdmin ? loadTeacherOptions(staff.institute.id) : Promise.resolve([]),
+    can(staff, "courses.manage")
+      ? loadTeacherOptions(staff.institute.id)
+      : Promise.resolve([]),
+    can(staff, "fees.view") ? loadCourseFees(supabase, courseIds) : null,
   ]);
 
   if (enrollmentResult.error) {
     return { status: "error", missing: missingTable(enrollmentResult.error) };
+  }
+  if (fees && !fees.ok) {
+    return { status: "error", missing: missingTable(fees.error) };
   }
 
   const counts = new Map<string, number>();
@@ -114,7 +137,9 @@ export async function loadCoursesPage(): Promise<
     status: "ready",
     staff,
     teachers,
-    courses: visible.map((course) => ({
+    courses: visible
+      .map((row) => withCourseFee(row, fees?.fees ?? null))
+      .map((course) => ({
       id: course.id,
       name: course.name,
       level: course.level,

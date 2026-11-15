@@ -1,6 +1,6 @@
 # TuitionDesk pivot: students, fees, exams and QR attendance
 
-Status: Phase 1 (+ bulk student import) and Phase 2 (attendance) built 2026-11-10. Teachers can run attendance for the classes they teach. Exam features retired 2026-11-10 (migration 020; exam data kept in the database, unused): the app is students, attendance and tuition fees. Decided: receipts only (no invoices); attendance per class session. Builds on the existing app (Next.js 16 App Router, Supabase, numbered SQL in `supabase/sql/`). Next migration number is **024**.
+Status: Phase 1 (+ bulk student import) and Phase 2 (attendance) built 2026-11-10. Teachers can run attendance for the classes they teach. Exam features retired 2026-11-10 (migration 020; exam data kept in the database, unused): the app is students, attendance and tuition fees. Decided: receipts only (no invoices); attendance per class session. Builds on the existing app (Next.js 16 App Router, Supabase, numbered SQL in `supabase/sql/`). Next migration number is **025**.
 
 ## 1. What changes
 

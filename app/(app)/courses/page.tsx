@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CourseManager } from "@/components/courses/course-manager";
 import { loadCoursesPage } from "@/lib/class-courses";
 import { t } from "@/lib/t";
+import { can } from "@/lib/permissions";
 
 export default function CoursesPage() {
   return (
@@ -36,7 +37,7 @@ async function CourseList() {
     <CourseManager
       courses={page.courses}
       teachers={page.teachers}
-      canEdit={page.staff.role === "admin"}
+      canEdit={can(page.staff, "courses.manage")}
     />
   );
 }

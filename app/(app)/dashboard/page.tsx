@@ -7,6 +7,7 @@ import { loadDashboard, type ClassSummary } from "@/lib/dashboard";
 import { formatMonth } from "@/lib/dates";
 import { formatLkr } from "@/lib/money";
 import { t } from "@/lib/t";
+import { can } from "@/lib/permissions";
 
 export default function DashboardPage() {
   return (
@@ -56,7 +57,7 @@ async function Dashboard() {
           label={t("Active students")}
         />
         <TodayFigure today={summary?.today ?? null} />
-        {staff.role === "admin" ? (
+        {can(staff, "fees.view") ? (
           <Figure
             href="/payments"
             value={moneyOrDash(summary?.overdueMinor)}
@@ -64,7 +65,7 @@ async function Dashboard() {
             tone={summary?.overdueMinor ? "overdue" : undefined}
           />
         ) : null}
-        {staff.role === "admin" ? (
+        {can(staff, "fees.view") ? (
           <Figure
             href="/payments"
             value={moneyOrDash(summary?.collectedThisMonthMinor)}
@@ -73,9 +74,9 @@ async function Dashboard() {
         ) : null}
       </section>
 
-      {summary && staff.role === "admin" ? <Breakdown summary={summary} /> : null}
+      {summary && can(staff, "fees.view") ? <Breakdown summary={summary} /> : null}
       {summary ? <Attention summary={summary} /> : null}
-      {staff.role === "admin" ? (
+      {can(staff, "notices.class") ? (
         <Suspense fallback={null}>
           <NoticeSection courseId={null} canManage />
         </Suspense>

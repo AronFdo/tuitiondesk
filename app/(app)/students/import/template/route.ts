@@ -3,12 +3,13 @@ import { templateCsv } from "@/lib/student-import";
 import { createClient } from "@/lib/supabase/server";
 import { getStaff } from "@/lib/supabase/session";
 import { t } from "@/lib/t";
+import { can } from "@/lib/permissions";
 
 // The CSV template for bulk import, filled with this class's course names.
 // Sent as a real file download so it works in every browser, Safari included.
 export async function GET() {
   const staff = await getStaff();
-  if (!staff || staff.role !== "admin") {
+  if (!staff || !can(staff, "students.manage")) {
     return new Response(t("Only the class owner can add students."), {
       status: 403,
       headers: { "Content-Type": "text/plain; charset=utf-8" },

@@ -4,6 +4,7 @@ import { loadStudentFacts } from "@/lib/student-context";
 import { signedPhotoUrls } from "@/lib/student-photos";
 import { createClient } from "@/lib/supabase/server";
 import { getStaff, type StaffContext } from "@/lib/supabase/session";
+import { can } from "@/lib/permissions";
 
 export type RunnableCourse = { id: string; name: string; scheduleText: string | null };
 
@@ -62,7 +63,7 @@ async function runnableCourses(staff: StaffContext) {
     .eq("institute_id", staff.institute.id)
     .is("archived_at", null)
     .order("name");
-  if (staff.role !== "admin") {
+  if (!can(staff, "courses.all")) {
     query = query.eq("teacher_profile_id", staff.userId);
   }
   return query;
@@ -198,11 +199,11 @@ export async function loadSessionPage(sessionId: string): Promise<
   }
   const students = studentsResult.data ?? [];
 
-  const isAdmin = staff.role === "admin";
+  const canViewFees = can(staff, "fees.view");
   const [photos, facts] = await Promise.all([
     // A class can run for hours on one screen.
     signedPhotoUrls(supabase, students.map((student) => student.photo_path), 60 * 60 * 4),
-    isAdmin
+    canViewFees
       ? loadStudentFacts(supabase, instituteId, students.map((student) => student.id), true)
       : Promise.resolve(null),
   ]);

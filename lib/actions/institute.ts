@@ -15,6 +15,7 @@ import {
   type InstituteInput,
   type InviteTeacherInput,
 } from "@/lib/validation/institute";
+import { can } from "@/lib/permissions";
 
 const phoneError = t(
   "That phone number looks incomplete. Use 10 digits, like 0771234567.",
@@ -38,7 +39,7 @@ async function requireAdmin() {
   if (!staff) {
     return { ok: false as const, error: t("Sign in to continue.") };
   }
-  if (staff.role !== "admin") {
+  if (!can(staff, "institute.manage")) {
     return {
       ok: false as const,
       error: t("Only the class owner can do that."),

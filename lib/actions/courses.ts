@@ -16,6 +16,7 @@ import {
   type CourseInput,
   type CourseUpdateInput,
 } from "@/lib/validation/course";
+import { can } from "@/lib/permissions";
 
 function firstIssue(message: string | undefined) {
   return t(message ?? "Check the form and try again.");
@@ -62,7 +63,7 @@ async function requireAdmin() {
   if (!staff) {
     return { ok: false as const, error: t("Sign in to continue.") };
   }
-  if (staff.role !== "admin") {
+  if (!can(staff, "courses.manage")) {
     return {
       ok: false as const,
       error: t("Only the class owner can do that."),

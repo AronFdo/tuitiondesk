@@ -9,6 +9,7 @@ import { loadCourse } from "@/lib/course-detail";
 import { formatDueDay } from "@/lib/dates";
 import { formatLkr } from "@/lib/money";
 import { t } from "@/lib/t";
+import { can } from "@/lib/permissions";
 
 export default function CoursePage({
   params,
@@ -65,7 +66,7 @@ async function CourseDetail({
   ]
     .filter(Boolean)
     .join(" · ");
-  const canEdit = page.staff.role === "admin";
+  const canEdit = can(page.staff, "courses.manage");
 
   return (
     <div className="flex flex-col gap-10">

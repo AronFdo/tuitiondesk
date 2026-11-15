@@ -1,3 +1,5 @@
+import { loadCourseFees } from "@/lib/course-fees";
+import { can } from "@/lib/permissions";
 import { receiptsForPayments } from "@/lib/receipts";
 import { createClient } from "@/lib/supabase/server";
 import { getStaff } from "@/lib/supabase/session";
@@ -31,6 +33,7 @@ export function missingTable(error: { code?: string; message: string }) {
   return (
     error.code === "PGRST205" ||
     error.code === "PGRST204" ||
+    error.code === "PGRST202" ||
     error.code === "42P01" ||
     error.code === "42703" ||
     error.message.includes("schema cache")
@@ -52,7 +55,7 @@ export async function loadPaymentsPage(): Promise<
   if (!staff) {
     return { status: "signed-out" };
   }
-  if (staff.role !== "admin") {
+  if (!can(staff, "fees.view")) {
     return { status: "forbidden" };
   }
 
@@ -61,7 +64,7 @@ export async function loadPaymentsPage(): Promise<
   const [coursesResult, enrollmentsResult, tuitionResult] = await Promise.all([
     supabase
       .from("courses")
-      .select("id, name, monthly_fee_minor")
+      .select("id, name")
       .eq("institute_id", instituteId)
       .is("archived_at", null)
       .order("name"),
@@ -84,6 +87,13 @@ export async function loadPaymentsPage(): Promise<
   }
 
   const courses = coursesResult.data ?? [];
+  const courseFees = await loadCourseFees(
+    supabase,
+    courses.map((course) => course.id),
+  );
+  if (!courseFees.ok) {
+    return { status: "error", missing: missingTable(courseFees.error) };
+  }
   const courseNames = new Map(courses.map((course) => [course.id, course.name]));
   const studentIds = [
     ...new Set([
@@ -113,7 +123,7 @@ export async function loadPaymentsPage(): Promise<
     courses: courses.map((course) => ({
       id: course.id,
       name: course.name,
-      monthlyFeeMinor: course.monthly_fee_minor,
+      monthlyFeeMinor: courseFees.fees.get(course.id)?.monthlyFeeMinor ?? 0,
     })),
     students: (enrollmentsResult.data ?? [])
       .filter((row) => studentNames.has(row.student_id) && courseNames.has(row.course_id))

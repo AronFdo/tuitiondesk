@@ -11,6 +11,7 @@ import { PHOTO_BUCKET } from "@/lib/student-photos";
 import { createClient } from "@/lib/supabase/server";
 import { getStaff } from "@/lib/supabase/session";
 import { t } from "@/lib/t";
+import { can } from "@/lib/permissions";
 
 const uuid = /^[0-9a-f-]{36}$/i;
 const photoTypes: Record<string, string> = {
@@ -27,7 +28,7 @@ async function requireAdmin() {
   if (!staff) {
     return { ok: false as const, error: t("Sign in to continue.") };
   }
-  if (staff.role !== "admin") {
+  if (!can(staff, "students.manage")) {
     return { ok: false as const, error: t("Only the class owner can do that.") };
   }
   return { ok: true as const, staff, supabase: await createClient() };

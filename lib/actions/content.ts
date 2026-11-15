@@ -13,6 +13,7 @@ import {
   inviteParentSchema,
   type InviteParentInput,
 } from "@/lib/validation/content";
+import { can } from "@/lib/permissions";
 
 const maxBytes = 26_214_400;
 
@@ -73,7 +74,7 @@ async function courseEditor(courseId: string) {
     return { ok: false as const, error: t("That course is not in this class.") };
   }
   const allowed =
-    membership?.role === "admin" || course.teacher_profile_id === session.userId;
+    can(membership, "courses.all") || course.teacher_profile_id === session.userId;
   if (!allowed) {
     return {
       ok: false as const,
@@ -194,7 +195,7 @@ export async function deleteCourseFile(input: { fileId: string }): Promise<Actio
     .maybeSingle();
   const allowed =
     profile?.active_institute_id === row.institute_id &&
-    (membership?.role === "admin" || course?.teacher_profile_id === session.userId);
+    (can(membership, "courses.all") || course?.teacher_profile_id === session.userId);
   if (!allowed) {
     return {
       ok: false,
@@ -265,7 +266,7 @@ export async function inviteParent(input: InviteParentInput): Promise<ActionResu
     .eq("profile_id", session.userId)
     .eq("institute_id", profile.active_institute_id)
     .maybeSingle();
-  if (membership?.role !== "admin") {
+  if (!can(membership, "parents.invite")) {
     return { ok: false, error: t("Only the class owner can do that.") };
   }
 

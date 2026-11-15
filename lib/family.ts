@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadCourseFees } from "@/lib/course-fees";
 import { colomboToday } from "@/lib/dates";
 import {
   buildReminders,
@@ -210,17 +211,23 @@ async function childCourses(
   }
   const courses = await supabase
     .from("courses")
-    .select("id, name, tuition_due_day, monthly_fee_minor")
+    .select("id, name")
     .in("id", [...starts.keys()])
     .is("archived_at", null)
     .order("name");
   if (courses.error) {
     return { ok: false, failure: failed(courses.error) };
   }
+  const fees = await loadCourseFees(supabase, [...starts.keys()]);
+  if (!fees.ok) {
+    return { ok: false, failure: failed(fees.error) };
+  }
   return {
     ok: true,
     courses: (courses.data ?? []).map((course) => ({
       ...course,
+      tuition_due_day: fees.fees.get(course.id)?.tuitionDueDay ?? null,
+      monthly_fee_minor: fees.fees.get(course.id)?.monthlyFeeMinor ?? 0,
       startDate: starts.get(course.id) ?? context.today,
     })),
   };

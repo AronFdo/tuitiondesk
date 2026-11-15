@@ -6,6 +6,7 @@ import { STUDENT_COLUMNS, studentInput, type StudentRow } from "@/lib/student-fi
 import { createClient } from "@/lib/supabase/server";
 import { getStaff } from "@/lib/supabase/session";
 import { t } from "@/lib/t";
+import { can } from "@/lib/permissions";
 
 type Params = Promise<{ studentId: string }>;
 
@@ -23,7 +24,7 @@ async function EditStudent({ params }: { params: Params }) {
     redirect("/sign-in");
   }
   const back = `/students/${studentId}`;
-  if (staff.role !== "admin") {
+  if (!can(staff, "students.manage")) {
     return <p className="text-slate">{t("Only the class owner can edit student details.")}</p>;
   }
   if (!/^[0-9a-f-]{36}$/i.test(studentId)) {

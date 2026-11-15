@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { t } from "@/lib/t";
 import { DOCUMENT_KINDS } from "@/lib/document-kinds";
 import { z } from "zod";
+import { can } from "@/lib/permissions";
 
 // Copies of students' papers. Identity documents of children: admins only,
 // in a private bucket.
@@ -48,7 +49,7 @@ async function requireAdmin() {
     .eq("profile_id", user.id)
     .eq("institute_id", profile.active_institute_id)
     .maybeSingle();
-  if (membership?.role !== "admin") {
+  if (!can(membership, "students.documents")) {
     return { ok: false as const, error: t("Only the class owner can do that.") };
   }
   return {

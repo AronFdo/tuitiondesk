@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { AppShell } from "@/components/app/app-shell";
+import { AppShell, type ShellNavItem } from "@/components/app/app-shell";
 import { signedLogoUrl } from "@/lib/institute-logo";
+import { can } from "@/lib/permissions";
 import { getParent, getStaff } from "@/lib/supabase/session";
 import { t } from "@/lib/t";
 
@@ -25,6 +26,10 @@ async function StaffFrame({
   }
 
   const logoUrl = await signedLogoUrl(staff.institute.logo_path);
+  const canViewFees = can(staff, "fees.view");
+  const payments: ShellNavItem[] = canViewFees
+    ? [{ href: "/payments", label: t("Payments"), icon: "payments" }]
+    : [];
 
   return (
     <AppShell
@@ -35,13 +40,13 @@ async function StaffFrame({
         { href: "/students", label: t("Students") },
         { href: "/attendance", label: t("Attendance") },
         { href: "/courses", label: t("Courses") },
-        { href: "/payments", label: t("Payments") },
+        ...payments.map(({ href, label }) => ({ href, label })),
       ]}
       bottomItems={[
         { href: "/students", label: t("Students"), icon: "students" },
         { href: "/attendance", label: t("Attendance"), icon: "attendance" },
         { href: "/courses", label: t("Courses"), icon: "courses" },
-        { href: "/payments", label: t("Payments"), icon: "payments" },
+        ...payments,
       ]}
       settings={{ href: "/settings", label: t("Settings"), mobileLabel: t("More") }}
       homeHref="/dashboard"

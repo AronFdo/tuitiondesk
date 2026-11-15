@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadCourseFees } from "@/lib/course-fees";
 import { nextTuitionDate } from "@/lib/dues";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -35,8 +36,8 @@ function missingTable(error: { code?: string; message: string }) {
   return (
     error.code === "PGRST205" ||
     error.code === "42P01" ||
-    error.message.includes("schema cache") ||
-    error.message.includes("tuition_due_day")
+    error.code === "PGRST202" ||
+    error.message.includes("schema cache")
   );
 }
 
@@ -68,7 +69,7 @@ export async function loadStudentFacts(
   }
 
   const courseIds = [...new Set((enrollmentResult.data ?? []).map((row) => row.course_id))];
-  const courseRows = await loadCourseRows(supabase, courseIds);
+  const courseRows = await loadCourseRows(supabase, courseIds, includeFees);
   if (!courseRows.ok) {
     return courseRows;
   }
@@ -180,45 +181,46 @@ export async function loadStudentFacts(
   return { ok: true, byStudent };
 }
 
-async function loadCourseRows(supabase: Client, courseIds: string[]) {
+// Fees come back only when the caller may see them; otherwise every course
+// has no fee and no due day.
+async function loadCourseRows(
+  supabase: Client,
+  courseIds: string[],
+  includeFees: boolean,
+) {
+  type Row = {
+    id: string;
+    name: string;
+    tuition_due_day: number | null;
+    monthly_fee_minor: number;
+  };
   if (courseIds.length === 0) {
-    return {
-      ok: true as const,
-      rows: [] as {
-        id: string;
-        name: string;
-        tuition_due_day: number | null;
-        monthly_fee_minor: number;
-      }[],
-    };
+    return { ok: true as const, rows: [] as Row[] };
   }
 
-  const detailed = await supabase
-    .from("courses")
-    .select("id, name, tuition_due_day, monthly_fee_minor")
-    .in("id", courseIds)
-    .is("archived_at", null);
-  if (!detailed.error) {
-    return { ok: true as const, rows: detailed.data ?? [] };
-  }
-  if (!missingTable(detailed.error)) {
-    return { ok: false as const, missing: missingTable(detailed.error) };
-  }
-
-  const basic = await supabase
-    .from("courses")
-    .select("id, name")
-    .in("id", courseIds)
-    .is("archived_at", null);
+  const [basic, fees] = await Promise.all([
+    supabase
+      .from("courses")
+      .select("id, name")
+      .in("id", courseIds)
+      .is("archived_at", null),
+    includeFees ? loadCourseFees(supabase, courseIds) : null,
+  ]);
   if (basic.error) {
     return { ok: false as const, missing: missingTable(basic.error) };
   }
+  if (fees && !fees.ok) {
+    return { ok: false as const, missing: missingTable(fees.error) };
+  }
   return {
     ok: true as const,
-    rows: (basic.data ?? []).map((course) => ({
-      ...course,
-      tuition_due_day: null,
-      monthly_fee_minor: 0,
-    })),
+    rows: (basic.data ?? []).map((course): Row => {
+      const fee = fees?.fees.get(course.id);
+      return {
+        ...course,
+        tuition_due_day: fee?.tuitionDueDay ?? null,
+        monthly_fee_minor: fee?.monthlyFeeMinor ?? 0,
+      };
+    }),
   };
 }

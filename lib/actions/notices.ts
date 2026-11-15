@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getStaff } from "@/lib/supabase/session";
 import { t } from "@/lib/t";
 import { noticeIdSchema, noticeSchema, type NoticeInput } from "@/lib/validation/notices";
+import { can } from "@/lib/permissions";
 
 // Notices staff post for parents: to one course, or (admins only) to the whole
 // class. Removing one archives it; nothing is deleted.
@@ -22,7 +23,7 @@ async function noticeEditor(courseId: string | null) {
   }
   const supabase = await createClient();
   if (!courseId) {
-    if (staff.role !== "admin") {
+    if (!can(staff, "notices.class")) {
       return { ok: false as const, error: t("Only the class owner can post to the whole class.") };
     }
     return { ok: true as const, supabase, staff };
@@ -37,7 +38,7 @@ async function noticeEditor(courseId: string | null) {
   if (!course) {
     return { ok: false as const, error: t("That course is not in this class.") };
   }
-  if (staff.role !== "admin" && course.teacher_profile_id !== staff.userId) {
+  if (!can(staff, "courses.all") && course.teacher_profile_id !== staff.userId) {
     return {
       ok: false as const,
       error: t("Only the class owner or this course's teacher can do that."),

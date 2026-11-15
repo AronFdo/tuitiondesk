@@ -6,9 +6,13 @@ import { signedPhotoUrls } from "@/lib/student-photos";
 import { qrSvg } from "@/lib/qr-svg";
 import { createClient } from "@/lib/supabase/server";
 import { getStaff } from "@/lib/supabase/session";
+import { can } from "@/lib/permissions";
 
 export type StudentProfile = {
   canEdit: boolean;
+  canViewFees: boolean;
+  canViewDocuments: boolean;
+  canInviteParent: boolean;
   student: {
     id: string;
     fullName: string;
@@ -70,7 +74,7 @@ export async function loadStudentProfile(studentId: string): Promise<
 
   const supabase = await createClient();
   const instituteId = staff.institute.id;
-  const isAdmin = staff.role === "admin";
+  const canViewFees = can(staff, "fees.view");
   const [studentResult, enrollmentsResult] = await Promise.all([
     supabase
       .from("students")
@@ -97,7 +101,7 @@ export async function loadStudentProfile(studentId: string): Promise<
   }
 
   const [facts, photos, cardSvg] = await Promise.all([
-    loadStudentFacts(supabase, instituteId, [student.id], isAdmin),
+    loadStudentFacts(supabase, instituteId, [student.id], canViewFees),
     signedPhotoUrls(supabase, [student.photo_path]),
     qrSvg(cardPayload(student.qr_token)),
   ]);
@@ -112,7 +116,10 @@ export async function loadStudentProfile(studentId: string): Promise<
   return {
     status: "ready",
     profile: {
-      canEdit: isAdmin,
+      canEdit: can(staff, "students.manage"),
+      canViewFees,
+      canViewDocuments: can(staff, "students.documents"),
+      canInviteParent: can(staff, "parents.invite"),
       student: {
         id: student.id,
         fullName: student.full_name,
@@ -145,7 +152,7 @@ export async function loadStudentFees(studentId: string): Promise<
   | { status: "ready"; fees: StudentFees }
 > {
   const staff = await getStaff();
-  if (!staff || staff.role !== "admin" || !isUuid(studentId)) {
+  if (!staff || !can(staff, "fees.view") || !isUuid(studentId)) {
     return { status: "forbidden" };
   }
   const supabase = await createClient();

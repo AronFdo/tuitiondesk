@@ -7,6 +7,7 @@ import { loadImportContext } from "@/lib/student-import-context";
 import { createClient } from "@/lib/supabase/server";
 import { getStaff } from "@/lib/supabase/session";
 import { t } from "@/lib/t";
+import { can } from "@/lib/permissions";
 
 export default function ImportStudentsPage() {
   return (
@@ -29,7 +30,7 @@ async function ImportScreen() {
       <h1 className="mt-1">{t("Import students")}</h1>
     </div>
   );
-  if (staff.role !== "admin") {
+  if (!can(staff, "students.manage")) {
     return (
       <div className="flex flex-col gap-4">
         {header}

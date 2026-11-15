@@ -5,20 +5,22 @@ import { redirect } from "next/navigation";
 import { StaffActions } from "@/components/staff/staff-actions";
 import { formatDate } from "@/lib/dates";
 import { loadStaffMember, loginLabel } from "@/lib/staff";
+import { loginResultText } from "@/lib/staff-login";
 import { t } from "@/lib/t";
 
 type Params = Promise<{ staffId: string }>;
+type SearchParams = Promise<{ login?: string }>;
 
-export default function StaffMemberPage({ params }: { params: Params }) {
+export default function StaffMemberPage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   return (
     <Suspense fallback={<p className="text-slate">{t("Loading…")}</p>}>
-      <StaffMember params={params} />
+      <StaffMember params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function StaffMember({ params }: { params: Params }) {
-  const { staffId } = await params;
+async function StaffMember({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
+  const [{ staffId }, { login: loginResult }] = await Promise.all([params, searchParams]);
   const result = await loadStaffMember(staffId);
   if (result.status === "signed-out") {
     redirect("/sign-in");
@@ -56,6 +58,8 @@ async function StaffMember({ params }: { params: Params }) {
     [t("Notes"), d.notes],
   ];
   const filled = items.filter(([, value]) => value !== null && value !== "");
+  // Set by the add form when it also gave (or tried to give) a login.
+  const notice = active ? loginResultText(loginResult) : null;
 
   return (
     <div className="flex max-w-2xl flex-col gap-8">
@@ -65,6 +69,18 @@ async function StaffMember({ params }: { params: Params }) {
         </Link>
         <h1 className="mt-1 break-words">{d.full_name}</h1>
         {member.isSelf ? <p className="text-sm text-slate">{t("This is you.")}</p> : null}
+        {notice ? (
+          <p
+            role="status"
+            className={`mt-4 rounded-lg border p-3 text-sm ${
+              notice.ok
+                ? "border-line bg-mint-soft text-forest"
+                : "border-line bg-[var(--status-overdue-bg)] text-[var(--status-overdue-fg)]"
+            }`}
+          >
+            {notice.text}
+          </p>
+        ) : null}
         <div className="mt-4">
           <StaffActions
             member={{

@@ -30,6 +30,9 @@ export function StaffForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [courseIds, setCourseIds] = useState<string[]>(initialCourseIds);
+  // Adding only: give them a login in the same step, using the email above.
+  const [allowLogin, setAllowLogin] = useState(false);
+  const [role, setRole] = useState<"teacher" | "admin">("teacher");
   const saving = useRef(false);
   const form = useForm<StaffInput>({ defaultValues: defaults ?? emptyStaff });
   const {
@@ -54,20 +57,27 @@ export function StaffForm({
       setError(t("Some details need fixing. They are marked below."));
       return;
     }
+    if (!staffId && allowLogin && !parsed.data.email) {
+      form.setError("email", { message: "Enter their email so the invite has somewhere to go." });
+      form.setFocus("email");
+      setError(t("Some details need fixing. They are marked below."));
+      return;
+    }
     saving.current = true;
     setError(null);
     setPending(true);
     const result = staffId
       ? await updateStaffMember({ staffId, staff: values, courseIds: courses ? courseIds : undefined }).catch(() => null)
-      : await createStaffMember({ staff: values }).catch(() => null);
+      : await createStaffMember({ staff: values, login: allowLogin ? { role } : undefined }).catch(() => null);
     saving.current = false;
     setPending(false);
     if (!result?.ok) {
       setError(result?.error ?? t("No connection. Nothing was saved. Try again when you are back online."));
       return;
     }
-    const target = staffId ?? (result.data as { staffId: string }).staffId;
-    router.push(`/staff/${target}`);
+    const created = result.data as { staffId: string; login: string | null } | undefined;
+    const target = staffId ?? created?.staffId;
+    router.push(`/staff/${target}${created?.login ? `?login=${created.login}` : ""}`);
     router.refresh();
   }
 
@@ -123,6 +133,59 @@ export function StaffForm({
         </div>
       </Section>
 
+      {staffId ? null : (
+        <fieldset>
+          <legend className="mb-2 font-heading text-lg font-semibold text-forest">{t("Login access")}</legend>
+          <label className="flex min-h-11 items-center gap-3 text-ink">
+            <input
+              type="checkbox"
+              className="size-5 accent-forest"
+              checked={allowLogin}
+              onChange={(event) => setAllowLogin(event.target.checked)}
+            />
+            {t("Let them sign in to TuitionDesk")}
+          </label>
+          {allowLogin ? (
+            <div role="radiogroup" aria-label={t("They sign in as")} className="mt-2 flex flex-col gap-1 sm:pl-8">
+              <p className="text-sm text-slate">
+                {t("An invite goes to the email above. They set a password from it.")}
+              </p>
+              {(
+                [
+                  {
+                    value: "teacher",
+                    label: t("Teacher"),
+                    hint: t("Takes attendance and posts notices and files for the courses they teach. Cannot see fees."),
+                  },
+                  {
+                    value: "admin",
+                    label: t("Admin"),
+                    hint: t("Can do everything you can: fees, students, staff, settings, and adding other admins."),
+                  },
+                ] as const
+              ).map((option) => (
+                <label key={option.value} className="mt-2 flex items-start gap-3 py-1">
+                  <input
+                    type="radio"
+                    name="staff-new-role"
+                    value={option.value}
+                    checked={role === option.value}
+                    onChange={() => setRole(option.value)}
+                    className="mt-1 size-5 accent-forest"
+                  />
+                  <span>
+                    <span className="block text-ink">{option.label}</span>
+                    <span className="block text-sm text-slate">{option.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate">{t("You can also do this later from their page.")}</p>
+          )}
+        </fieldset>
+      )}
+
       {courses ? (
         <fieldset>
           <legend className="mb-2 font-heading text-lg font-semibold text-forest">{t("Courses they teach")}</legend>
@@ -162,7 +225,13 @@ export function StaffForm({
       ) : null}
       <div className="flex flex-wrap gap-3">
         <Button type="submit" className="h-11 px-5" disabled={pending}>
-          {pending ? t("Saving…") : staffId ? t("Save changes") : t("Add staff member")}
+          {pending
+            ? t("Saving…")
+            : staffId
+              ? t("Save changes")
+              : allowLogin
+                ? t("Add and send invite")
+                : t("Add staff member")}
         </Button>
         <Link
           href={cancelHref}

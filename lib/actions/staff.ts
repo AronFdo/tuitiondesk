@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getStaff } from "@/lib/supabase/session";
 import { getRequestOrigin } from "@/lib/site";
+import { loginDoneText, loginProblemText, type LoginProblem } from "@/lib/staff-login";
 import { t } from "@/lib/t";
 import { staffColumns, staffSchema, type StaffInput } from "@/lib/validation/staff";
 
@@ -41,12 +42,29 @@ function saveError(error: { code?: string; message: string } | null) {
   return t("That could not be saved. Check your connection and try again.");
 }
 
+// Add a staff member and, when login is given, let them sign in straight
+// away using the email on the form. If the person is saved but the login
+// cannot be set up, the result says why so their page can explain it.
 export async function createStaffMember(input: {
   staff: StaffInput;
-}): Promise<ActionResult<{ staffId: string }>> {
+  login?: { role: string };
+}): Promise<
+  ActionResult<{
+    staffId: string;
+    login: "invited" | "linked" | LoginProblem | null;
+  }>
+> {
   const parsed = staffSchema.safeParse(input.staff);
   if (!parsed.success) {
     return { ok: false, error: firstIssue(parsed.error.issues[0]?.message) };
+  }
+  if (input.login) {
+    if (!isStaffRole(input.login.role)) {
+      return { ok: false, error: t("Choose teacher or admin.") };
+    }
+    if (!parsed.data.email) {
+      return { ok: false, error: t("Enter their email so the invite has somewhere to go.") };
+    }
   }
   const manager = await requireManager();
   if (!manager.ok) {
@@ -61,8 +79,19 @@ export async function createStaffMember(input: {
     console.error("createStaffMember", error?.code, error?.message);
     return { ok: false, error: saveError(error) };
   }
+
+  let login: "invited" | "linked" | LoginProblem | null = null;
+  if (input.login && parsed.data.email && isStaffRole(input.login.role)) {
+    const result = await grantLogin(
+      manager,
+      { id: data.id, email: parsed.data.email },
+      parsed.data.email,
+      input.login.role,
+    );
+    login = result.ok ? (result.invited ? "invited" : "linked") : result.problem;
+  }
   refresh();
-  return { ok: true, data: { staffId: data.id } };
+  return { ok: true, data: { staffId: data.id, login } };
 }
 
 // Save details and, when courseIds is given, the courses they teach.
@@ -115,6 +144,80 @@ export async function updateStaffMember(input: {
 type StaffRole = "admin" | "teacher";
 const isStaffRole = (value: string): value is StaffRole => value === "admin" || value === "teacher";
 
+type Manager = Extract<Awaited<ReturnType<typeof requireManager>>, { ok: true }>;
+
+// Find or invite the account for this email, then link it to the staff row
+// with the given role. Shared by the add form and "Give login access".
+async function grantLogin(
+  manager: Manager,
+  member: { id: string; email: string | null },
+  email: string,
+  role: StaffRole,
+): Promise<{ ok: true; invited: boolean } | { ok: false; problem: LoginProblem }> {
+  const adminClient = createAdminClient();
+  if (!adminClient.ok) {
+    return { ok: false, problem: "failed" };
+  }
+  const admin = adminClient.client;
+  const instituteId = manager.staff.institute.id;
+
+  const { data: existing } = await admin
+    .from("profiles")
+    .select("id, active_institute_id")
+    .eq("email", email)
+    .maybeSingle();
+  let profileId = existing?.id ?? null;
+  let invited = false;
+  if (!profileId) {
+    const origin = await getRequestOrigin();
+    if (!origin) {
+      return { ok: false, problem: "failed" };
+    }
+    const result = await admin.auth.admin.inviteUserByEmail(email, {
+      redirectTo: `${origin}/auth/callback?next=/accept-invite`,
+    });
+    if (result.error || !result.data.user) {
+      const message = result.error?.message.toLowerCase() ?? "";
+      return { ok: false, problem: message.includes("already") ? "exists" : "failed" };
+    }
+    profileId = result.data.user.id;
+    invited = true;
+    const { error: profileError } = await admin.from("profiles").insert({
+      id: profileId,
+      email,
+      full_name: null,
+      active_institute_id: instituteId,
+    });
+    if (profileError) {
+      return { ok: false, problem: "failed" };
+    }
+  } else if (!existing?.active_institute_id) {
+    await admin.from("profiles").update({ active_institute_id: instituteId }).eq("id", profileId);
+  }
+
+  // As the signed-in admin, so the database checks staff.manage itself.
+  const { error } = await manager.supabase.rpc("grant_staff_login", {
+    p_staff_id: member.id,
+    p_profile_id: profileId,
+    p_role: role,
+  });
+  if (error) {
+    console.error("grantLogin", error.code, error.message);
+    return {
+      ok: false,
+      problem: error.message.includes("family account")
+        ? "family"
+        : error.message.includes("already linked")
+          ? "linked"
+          : "failed",
+    };
+  }
+  if (!member.email) {
+    await manager.supabase.from("staff_members").update({ email }).eq("id", member.id);
+  }
+  return { ok: true, invited };
+}
+
 // Let a staff member sign in, as a teacher or an admin. An existing account
 // with that email is linked (keeping any role it already has here);
 // otherwise an invite email goes out and they set a password from it.
@@ -147,75 +250,12 @@ export async function giveStaffLogin(input: {
   if (member.profile_id) {
     return { ok: false, error: t("They can already sign in.") };
   }
-
-  const adminClient = createAdminClient();
-  if (!adminClient.ok) {
-    return adminClient;
-  }
-  const admin = adminClient.client;
-  const instituteId = manager.staff.institute.id;
-
-  const { data: existing } = await admin
-    .from("profiles")
-    .select("id, active_institute_id")
-    .eq("email", email.data)
-    .maybeSingle();
-  let profileId = existing?.id ?? null;
-  let invited = false;
-  if (!profileId) {
-    const origin = await getRequestOrigin();
-    if (!origin) {
-      return { ok: false, error: t("Something went wrong. Try again.") };
-    }
-    const result = await admin.auth.admin.inviteUserByEmail(email.data, {
-      redirectTo: `${origin}/auth/callback?next=/accept-invite`,
-    });
-    if (result.error || !result.data.user) {
-      const message = result.error?.message.toLowerCase() ?? "";
-      return {
-        ok: false,
-        error: message.includes("already")
-          ? t("That email already has an account. Ask them to sign in, then try again.")
-          : t("That invite could not be sent."),
-      };
-    }
-    profileId = result.data.user.id;
-    invited = true;
-    const { error: profileError } = await admin.from("profiles").insert({
-      id: profileId,
-      email: email.data,
-      full_name: null,
-      active_institute_id: instituteId,
-    });
-    if (profileError) {
-      return { ok: false, error: t("That invite could not be sent.") };
-    }
-  } else if (!existing?.active_institute_id) {
-    await admin.from("profiles").update({ active_institute_id: instituteId }).eq("id", profileId);
-  }
-
-  // As the signed-in admin, so the database checks staff.manage itself.
-  const { error } = await manager.supabase.rpc("grant_staff_login", {
-    p_staff_id: member.id,
-    p_profile_id: profileId,
-    p_role: input.role,
-  });
-  if (error) {
-    console.error("giveStaffLogin", error.code, error.message);
-    return {
-      ok: false,
-      error: error.message.includes("family account")
-        ? t("That email belongs to a parent's account. Use a different email for staff.")
-        : error.message.includes("already linked")
-          ? t("That email is already linked to someone else on your staff.")
-          : saveError(error),
-    };
-  }
-  if (!member.email) {
-    await manager.supabase.from("staff_members").update({ email: email.data }).eq("id", member.id);
+  const result = await grantLogin(manager, member, email.data, input.role);
+  if (!result.ok) {
+    return { ok: false, error: loginProblemText(result.problem) };
   }
   refresh();
-  return { ok: true, data: invited ? t("Invite sent. They set a password from the email, then sign in.") : t("Done. They can sign in with their existing account.") };
+  return { ok: true, data: loginDoneText(result.invited) };
 }
 
 export async function archiveStaffMember(input: { staffId: string }): Promise<ActionResult> {

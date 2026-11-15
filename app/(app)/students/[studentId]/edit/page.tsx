@@ -1,0 +1,64 @@
+import Link from "next/link";
+import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { StudentForm } from "@/components/students/student-form";
+import { STUDENT_COLUMNS, studentInput, type StudentRow } from "@/lib/student-fields";
+import { createClient } from "@/lib/supabase/server";
+import { getStaff } from "@/lib/supabase/session";
+import { t } from "@/lib/t";
+
+type Params = Promise<{ studentId: string }>;
+
+export default function EditStudentPage({ params }: { params: Params }) {
+  return (
+    <Suspense fallback={<p className="text-slate">{t("Loading…")}</p>}>
+      <EditStudent params={params} />
+    </Suspense>
+  );
+}
+
+async function EditStudent({ params }: { params: Params }) {
+  const [{ studentId }, staff] = await Promise.all([params, getStaff()]);
+  if (!staff) {
+    redirect("/sign-in");
+  }
+  const back = `/students/${studentId}`;
+  if (staff.role !== "admin") {
+    return <p className="text-slate">{t("Only the class owner can edit student details.")}</p>;
+  }
+  if (!/^[0-9a-f-]{36}$/i.test(studentId)) {
+    return <p className="text-slate">{t("That student is not in this class.")}</p>;
+  }
+  const { data, error } = await (await createClient())
+    .from("students")
+    .select(STUDENT_COLUMNS)
+    .eq("id", studentId)
+    .eq("institute_id", staff.institute.id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (error) {
+    return (
+      <p className="max-w-md text-slate">
+        {error.code === "42703"
+          ? t("Student details are not set up yet. Run 023_student_details.sql in Supabase, then refresh.")
+          : t("This student could not be loaded. Refresh the page to try again.")}
+      </p>
+    );
+  }
+  if (!data) {
+    return <p className="text-slate">{t("That student is not in this class.")}</p>;
+  }
+  const row = data as unknown as StudentRow;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <Link href={back} className="text-sm text-forest">
+          {row.full_name}
+        </Link>
+        <h1 className="mt-1">{t("Edit details")}</h1>
+      </div>
+      <StudentForm studentId={studentId} defaults={studentInput(row)} cancelHref={back} />
+    </div>
+  );
+}

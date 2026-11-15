@@ -9,7 +9,7 @@ import { STAFF_COLUMNS, type StaffRow } from "@/lib/validation/staff";
 export type StaffLogin = "admin" | "teacher" | null;
 
 export function loginLabel(login: StaffLogin) {
-  return login === "admin" ? t("Owner login") : login === "teacher" ? t("Teacher login") : t("No login");
+  return login === "admin" ? t("Admin login") : login === "teacher" ? t("Teacher login") : t("No login");
 }
 
 export type StaffListItem = {

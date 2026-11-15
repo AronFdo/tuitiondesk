@@ -30,7 +30,7 @@ function firstIssue(message: string | undefined) {
 
 function saveError(error: { code?: string; message: string } | null) {
   if (error?.code === "PGRST205" || error?.code === "42P01" || error?.code === "PGRST202") {
-    return t("The staff directory is not set up yet. Run 028_staff.sql in Supabase, then try again.");
+    return t("The staff directory is not set up yet. Run the files in supabase/sql up to 029_staff_roles.sql in Supabase, then try again.");
   }
   if (error?.message.includes("cannot archive yourself")) {
     return t("You cannot archive yourself.");
@@ -112,16 +112,23 @@ export async function updateStaffMember(input: {
   return { ok: true, data: undefined };
 }
 
-// Let a staff member sign in as a teacher. An existing account with that
-// email is linked; otherwise an invite email goes out and they set a
-// password from it.
+type StaffRole = "admin" | "teacher";
+const isStaffRole = (value: string): value is StaffRole => value === "admin" || value === "teacher";
+
+// Let a staff member sign in, as a teacher or an admin. An existing account
+// with that email is linked (keeping any role it already has here);
+// otherwise an invite email goes out and they set a password from it.
 export async function giveStaffLogin(input: {
   staffId: string;
   email: string;
+  role: string;
 }): Promise<ActionResult<string>> {
   const email = z.email().safeParse(input.email.trim().toLowerCase());
   if (!uuid.test(input.staffId) || !email.success) {
     return { ok: false, error: t("Enter a valid email.") };
+  }
+  if (!isStaffRole(input.role)) {
+    return { ok: false, error: t("Choose teacher or admin.") };
   }
   const manager = await requireManager();
   if (!manager.ok) {
@@ -191,6 +198,7 @@ export async function giveStaffLogin(input: {
   const { error } = await manager.supabase.rpc("grant_staff_login", {
     p_staff_id: member.id,
     p_profile_id: profileId,
+    p_role: input.role,
   });
   if (error) {
     console.error("giveStaffLogin", error.code, error.message);
@@ -239,6 +247,36 @@ export async function restoreStaffMember(input: { staffId: string }): Promise<Ac
   if (error) {
     console.error("restoreStaffMember", error.code, error.message);
     return { ok: false, error: saveError(error) };
+  }
+  refresh();
+  return { ok: true, data: undefined };
+}
+
+// Switch a login between teacher and admin. Nobody changes their own role.
+export async function setStaffRole(input: { staffId: string; role: string }): Promise<ActionResult> {
+  if (!uuid.test(input.staffId) || !isStaffRole(input.role)) {
+    return { ok: false, error: t("Choose teacher or admin.") };
+  }
+  const manager = await requireManager();
+  if (!manager.ok) {
+    return manager;
+  }
+  const { error } = await manager.supabase.rpc("set_staff_role", {
+    p_staff_id: input.staffId,
+    p_role: input.role,
+  });
+  if (error) {
+    console.error("setStaffRole", error.code, error.message);
+    return {
+      ok: false,
+      error: error.code === "PGRST202"
+        ? t("Changing roles is not set up yet. Run 029_staff_roles.sql in Supabase, then try again.")
+        : error.message.includes("own role")
+          ? t("You cannot change your own role. Ask another admin.")
+          : error.message.includes("no login")
+            ? t("They need login access first.")
+            : saveError(error),
+    };
   }
   refresh();
   return { ok: true, data: undefined };

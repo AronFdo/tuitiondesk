@@ -75,18 +75,20 @@ export function StaffForm({
     <form className="flex max-w-2xl flex-col gap-10" noValidate onSubmit={(event) => void form.handleSubmit(submit)(event)}>
       <Section title={t("Staff member")}>
         <TextField label={t("Full name")} autoComplete="off" required {...form.register("fullName")} {...meta("fullName")} />
+        {/* Paired fields carry no hint text, so their boxes line up across
+            the two columns; examples go in the placeholder instead. */}
         <TextField
           label={t("Job title")}
-          hint={t("Like Teacher, Front desk or Accountant.")}
           autoComplete="off"
+          placeholder={t("Teacher, Front desk, Accountant…")}
           {...form.register("title")}
           {...meta("title")}
         />
         <TextField
           label={t("NIC")}
-          hint={t("9 digits and V or X, or 12 digits.")}
           autoComplete="off"
           spellCheck={false}
+          placeholder="200512345678"
           {...form.register("nic")}
           {...meta("nic")}
         />
@@ -99,6 +101,9 @@ export function StaffForm({
             {...form.register("subjects")}
             {...meta("subjects")}
           />
+        </div>
+        <div className="sm:col-span-2">
+          <TextAreaField label={t("Notes")} {...form.register("notes")} {...meta("notes")} />
         </div>
       </Section>
 
@@ -149,8 +154,6 @@ export function StaffForm({
           )}
         </fieldset>
       ) : null}
-
-      <TextAreaField label={t("Notes")} {...form.register("notes")} {...meta("notes")} />
 
       {error ? (
         <p role="alert" className="text-sm text-destructive">

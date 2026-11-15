@@ -72,7 +72,7 @@ async function StaffMember({ params }: { params: Params }) {
               fullName: d.full_name,
               email: d.email,
               active,
-              hasLogin: member.login !== null,
+              login: member.login,
               isSelf: member.isSelf,
             }}
           />

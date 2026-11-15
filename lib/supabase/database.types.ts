@@ -1000,7 +1000,11 @@ export type Database = {
         Returns: undefined;
       };
       grant_staff_login: {
-        Args: { p_staff_id: string; p_profile_id: string };
+        Args: { p_staff_id: string; p_profile_id: string; p_role?: string };
+        Returns: undefined;
+      };
+      set_staff_role: {
+        Args: { p_staff_id: string; p_role: string };
         Returns: undefined;
       };
       archive_staff_member: {

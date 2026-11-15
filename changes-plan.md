@@ -1,6 +1,6 @@
 # TuitionDesk change set: notifications, course history, staff, change log, RBAC
 
-Status: planned 2026-11-15. S1 built 2026-11-15 (024_permissions.sql). S2 built 2026-11-16 (025_student_history.sql). S3 built 2026-11-16 (026_student_courses.sql, 027_course_history.sql). S4 built 2026-11-16 (028_staff.sql). Builds on `pivot-plan.md` (numbered SQL in `supabase/sql/`). Next migration number is **029**.
+Status: planned 2026-11-15. S1 built 2026-11-15 (024_permissions.sql). S2 built 2026-11-16 (025_student_history.sql). S3 built 2026-11-16 (026_student_courses.sql, 027_course_history.sql). S4 built 2026-11-16 (028_staff.sql; admins can add admins: 029_staff_roles.sql). Builds on `pivot-plan.md` (numbered SQL in `supabase/sql/`). Next migration number is **030**.
 
 ## Requested changes
 

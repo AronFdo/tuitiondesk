@@ -61,6 +61,11 @@ export function StudentActions({
       <a href={`/cards?student=${student.id}`} target="_blank" rel="noopener" className={linkClassName}>
         {t("Print card")}
       </a>
+      {/* A plain link: the route sends the file with the student's name, which
+          works in every browser, Safari included. */}
+      <a href={`/students/${student.id}/qr`} download className={linkClassName}>
+        {t("Download QR")}
+      </a>
       {canEdit ? (
         <>
           <Link href={`/students/${student.id}/edit`} className={linkClassName}>

@@ -2,6 +2,7 @@ import { courseHistory, leaveReasonLabel, type CourseHistoryItem } from "@/lib/c
 import { colomboToday } from "@/lib/dates";
 import { receiptsForPayments } from "@/lib/receipts";
 import { STUDENT_COLUMNS, type StudentRow } from "@/lib/student-fields";
+import { siteOrigin } from "@/lib/site";
 import { cardPayload } from "@/lib/student-card";
 import { loadStudentFacts, type LastTuition, type NextDue } from "@/lib/student-context";
 import { signedPhotoUrls } from "@/lib/student-photos";
@@ -113,7 +114,7 @@ export async function loadStudentProfile(studentId: string): Promise<
   const [facts, photos, cardSvg, namesResult] = await Promise.all([
     loadStudentFacts(supabase, instituteId, [student.id], canViewFees),
     signedPhotoUrls(supabase, [student.photo_path]),
-    qrSvg(cardPayload(student.qr_token)),
+    siteOrigin().then((origin) => qrSvg(cardPayload(student.qr_token, origin))),
     // Archived courses too, so old courses keep their names.
     everCourseIds.length === 0
       ? Promise.resolve({ data: [], error: null })

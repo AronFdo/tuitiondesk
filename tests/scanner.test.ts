@@ -26,6 +26,18 @@ describe("ScanDetector", () => {
     expect(detector.key("Enter", time + 5)).toEqual({ scan: null, swallow: true });
   });
 
+  it("finishes a link card on its last character and swallows every key of it", () => {
+    const link = "https://app.tuitiondesk.lk/c/0123456789abcdef0123456789abcdef";
+    const detector = new ScanDetector();
+    const results = [...link].map((key, index) => detector.key(key, 1000 + index * 8));
+    const time = 1000 + link.length * 8;
+    expect(results.at(-1)).toEqual({ scan: link, swallow: true });
+    // After the first character, every character belongs to the scan, so
+    // none of it lands in a focused search box.
+    expect(results.slice(1).every((result) => result.swallow)).toBe(true);
+    expect(detector.key("Enter", time + 5)).toEqual({ scan: null, swallow: true });
+  });
+
   it("reports other fast bursts that end in Enter", () => {
     const detector = new ScanDetector();
     const { time } = type(detector, "4791234567890", 10);

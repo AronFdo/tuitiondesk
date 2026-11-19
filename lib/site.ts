@@ -10,9 +10,15 @@ export async function getRequestOrigin() {
   return `${proto}://${host}`;
 }
 
-export function safeNextPath(next: string | null) {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) {
-    return "/dashboard";
+// The address printed into card QR codes. Set SITE_URL in production (like
+// https://app.tuitiondesk.lk) so cards always point at the live site, never
+// at a preview deployment; otherwise the address of the current request.
+export async function siteOrigin() {
+  const configured = process.env.SITE_URL?.trim();
+  if (configured && /^https?:\/\/[^/\s]+\/?$/i.test(configured)) {
+    return configured.replace(/\/+$/, "");
   }
-  return next;
+  return (await getRequestOrigin()) ?? "";
 }
+
+export { safeNextPath } from "@/lib/next-path";

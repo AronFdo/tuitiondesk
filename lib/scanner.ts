@@ -21,7 +21,8 @@ export type KeyResult = {
   swallow: boolean;
 };
 
-const CARD_PREFIX = "TD1:";
+// How a card's code starts: a link (current cards) or "TD1:" (older ones).
+const CARD_STARTS = ["HTTPS://", "HTTP://", "TD1:"];
 
 export class ScanDetector {
   private buffer = "";
@@ -78,5 +79,5 @@ export class ScanDetector {
 
 function looksLikeCard(text: string) {
   const upper = text.toUpperCase();
-  return upper.startsWith(CARD_PREFIX) || CARD_PREFIX.startsWith(upper);
+  return CARD_STARTS.some((start) => upper.startsWith(start) || start.startsWith(upper));
 }

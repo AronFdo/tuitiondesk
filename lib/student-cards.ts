@@ -1,5 +1,6 @@
 import { signedLogoUrl } from "@/lib/institute-logo";
 import { qrSvg } from "@/lib/qr-svg";
+import { siteOrigin } from "@/lib/site";
 import { cardPayload } from "@/lib/student-card";
 import { signedPhotoUrls } from "@/lib/student-photos";
 import { createClient } from "@/lib/supabase/server";
@@ -109,7 +110,9 @@ export async function loadCards(filter: { student?: string; course?: string }): 
     signedLogoUrl(staff.institute.logo_path),
     // Long enough to print a big batch.
     signedPhotoUrls(supabase, rows.map((row) => row.photo_path), 60 * 60),
-    Promise.all(rows.map((row) => qrSvg(cardPayload(row.qr_token)))),
+    siteOrigin().then((origin) =>
+      Promise.all(rows.map((row) => qrSvg(cardPayload(row.qr_token, origin)))),
+    ),
   ]);
 
   return {

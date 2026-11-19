@@ -2,16 +2,19 @@
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { FormError, SubmitButton } from "@/components/auth/form-bits";
 import { TextField } from "@/components/form/text-field";
 import { signIn } from "@/lib/actions/auth";
+import { safeNextPath } from "@/lib/next-path";
 import { t } from "@/lib/t";
 import type { SignInInput } from "@/lib/validation/auth";
 
 export function SignInForm() {
   const router = useRouter();
+  // Where to go after signing in, such as a scanned student card.
+  const next = safeNextPath(useSearchParams().get("next"));
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const form = useForm<SignInInput>({
@@ -27,7 +30,7 @@ export function SignInForm() {
       setError(result.error);
       return;
     }
-    router.push("/dashboard");
+    router.push(next);
     router.refresh();
   }
 

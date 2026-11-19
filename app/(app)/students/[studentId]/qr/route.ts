@@ -1,5 +1,6 @@
 import { attachmentHeader, qrFileName } from "@/lib/qr-download";
 import { qrPng } from "@/lib/qr-png";
+import { siteOrigin } from "@/lib/site";
 import { cardPayload } from "@/lib/student-card";
 import { createClient } from "@/lib/supabase/server";
 import { getStaff } from "@/lib/supabase/session";
@@ -31,7 +32,7 @@ export async function GET(
     return text(t("That student is not in this class."), 404);
   }
 
-  const png = await qrPng(cardPayload(student.qr_token));
+  const png = await qrPng(cardPayload(student.qr_token, await siteOrigin()));
   const fileName = qrFileName(student.full_name, student.student_code);
   return new Response(png as BodyInit, {
     headers: {

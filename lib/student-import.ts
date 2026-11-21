@@ -21,6 +21,7 @@ export type ImportField =
   | "firstName"
   | "lastName"
   | "dateOfBirth"
+  | "startDate"
   | "gender"
   | "nic"
   | "religion"
@@ -87,6 +88,7 @@ const HEADER_ALIASES: Record<ImportField, string[]> = {
   firstName: ["firstname", "givenname", "forename", "firstnames", "givennames"],
   lastName: ["lastname", "surname", "familyname"],
   dateOfBirth: ["dob", "dateofbirth", "birthday", "birthdate", "born"],
+  startDate: ["startdate", "startedon", "started", "joined", "joineddate", "datejoined", "joiningdate", "admissiondate", "dateofadmission", "enrolmentdate", "enrollmentdate"],
   gender: ["gender", "sex"],
   nic: ["nic", "nicno", "nicnumber", "nationalid", "nationalidentitycard", "idnumber", "nationalidno"],
   religion: ["religion"],
@@ -173,12 +175,12 @@ export function templateCsv(courseNames: string[]) {
   const rows = [
     TEMPLATE_COLUMNS,
     [
-      "Nimal", `Perera ${EXAMPLE_MARK}`, "18/04/2008", "Male", "200812345678", "0771234567", "nimal@example.com",
+      "Nimal", `Perera ${EXAMPLE_MARK}`, "18/04/2008", "03/01/2025", "Male", "200812345678", "0771234567", "nimal@example.com",
       "12 Temple Road, Kandy", "Kingswood College", "Sinhala", "Physical", first,
       "Kamala Perera", "0712345678", "Sunil Perera", "Kamala Perera", "Kamala Perera", "0712345678", "", "nimal.jpg",
     ],
     [
-      "Ayesha", `Fernando ${EXAMPLE_MARK}`, "2013-09-02", "Female", "", "", "",
+      "Ayesha", `Fernando ${EXAMPLE_MARK}`, "2013-09-02", "", "Female", "", "", "",
       "", "", "English", "Online", second ? `${first}; ${second}` : first,
       "Ruwan Fernando", "0712345678", "", "", "", "", "Delete both example rows before importing", "",
     ],
@@ -194,6 +196,7 @@ export const TEMPLATE_COLUMNS = [
   "First name",
   "Last name",
   "Date of birth",
+  "Start date",
   "Gender",
   "NIC",
   "Phone",
@@ -307,6 +310,12 @@ function collapse(value: string) {
 // 18-04-2012, 18.04.2012), or ISO (2012-04-18). A US-style month-first date is
 // taken only when it cannot be read day-first (04/18/2012).
 export function parseDateOfBirth(raw: string, today: string): string | null {
+  const date = parseDate(raw);
+  return date && date <= today ? date : null;
+}
+
+// Any date written the same ways, from 1900 on.
+export function parseDate(raw: string): string | null {
   const value = raw.trim();
   let year: number;
   let month: number;
@@ -337,7 +346,7 @@ export function parseDateOfBirth(raw: string, today: string): string | null {
     return null;
   }
   const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-  return date >= "1900-01-01" && date <= today ? date : null;
+  return date >= "1900-01-01" ? date : null;
 }
 
 export function parseGender(raw: string): "female" | "male" | null {
@@ -456,6 +465,13 @@ export function readStudentSheet(
       errors.push(`"${rawDate}" is not a date of birth. Use 18/04/2012.`);
     }
 
+    // Blank means they start today.
+    const rawStart = cell("startDate").trim();
+    const startDate = rawStart ? parseDate(rawStart) : options.today;
+    if (!startDate) {
+      errors.push(`"${rawStart}" is not a start date. Use 18/04/2025.`);
+    }
+
     const rawGender = cell("gender").trim();
     const gender = rawGender ? parseGender(rawGender) : null;
     if (!rawGender) {
@@ -547,6 +563,7 @@ export function readStudentSheet(
       firstName,
       lastName,
       dateOfBirth: dateOfBirth ?? "",
+      startDate: startDate ?? "",
       gender: gender ?? "",
       nic: nic.ok ? nic.value : "",
       religion: collapse(cell("religion")),

@@ -197,6 +197,7 @@ function Overview({ profile }: { profile: StudentProfile }) {
       title: t("Student"),
       items: [
         [t("Date of birth"), d.date_of_birth ? formatDate(d.date_of_birth) : null],
+        [t("Start date"), d.start_date ? formatDate(d.start_date) : null],
         [t("Gender"), d.gender === "female" ? t("Female") : d.gender === "male" ? t("Male") : null],
         [t("NIC"), d.nic],
         [t("Religion"), d.religion],

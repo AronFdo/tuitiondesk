@@ -10,6 +10,7 @@ export type ClassStudent = {
   code: string;
   photoUrl: string | null;
   dateOfBirth: string | null;
+  startDate: string | null;
   gender: string | null;
   guardianName: string | null;
   guardianPhone: string | null;
@@ -43,7 +44,7 @@ export async function loadStudentsPage({ left = false }: { left?: boolean } = {}
   const studentsResult = await supabase
     .from("students")
     .select(
-      "id, full_name, student_code, photo_path, date_of_birth, gender, guardian_name, guardian_phone, notes",
+      "id, full_name, student_code, photo_path, date_of_birth, start_date, gender, guardian_name, guardian_phone, notes",
     )
     .eq("institute_id", staff.institute.id)
     .eq("status", left ? "left" : "active")
@@ -81,6 +82,7 @@ export async function loadStudentsPage({ left = false }: { left?: boolean } = {}
         code: student.student_code,
         photoUrl: student.photo_path ? (photos.get(student.photo_path) ?? null) : null,
         dateOfBirth: student.date_of_birth,
+        startDate: student.start_date,
         gender: student.gender,
         guardianName: student.guardian_name,
         guardianPhone: student.guardian_phone,

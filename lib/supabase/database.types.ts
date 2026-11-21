@@ -367,6 +367,7 @@ export type Database = {
           guardian_name: string | null;
           guardian_phone: string | null;
           date_of_birth: string | null;
+          start_date: string;
           gender: string | null;
           id_type: string | null;
           id_number: string | null;
@@ -415,6 +416,7 @@ export type Database = {
           guardian_name?: string | null;
           guardian_phone?: string | null;
           date_of_birth?: string | null;
+          start_date?: string;
           gender?: string | null;
           id_type?: string | null;
           id_number?: string | null;
@@ -463,6 +465,7 @@ export type Database = {
           guardian_name?: string | null;
           guardian_phone?: string | null;
           date_of_birth?: string | null;
+          start_date?: string;
           gender?: string | null;
           id_type?: string | null;
           id_number?: string | null;

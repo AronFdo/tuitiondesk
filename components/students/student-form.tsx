@@ -51,7 +51,9 @@ export function StudentForm({
       )
     : [];
   const saving = useRef(false);
-  const form = useForm<StudentInput>({ defaultValues: defaults ?? emptyStudent });
+  const form = useForm<StudentInput>({
+    defaultValues: defaults ?? { ...emptyStudent, startDate: colomboToday() },
+  });
   const {
     formState: { errors },
   } = form;
@@ -110,6 +112,13 @@ export function StudentForm({
         <TextField label={t("First name")} autoComplete="off" required {...form.register("firstName")} {...meta("firstName")} />
         <TextField label={t("Last name")} autoComplete="off" {...form.register("lastName")} {...meta("lastName")} />
         <TextField label={t("Date of birth")} type="date" max={colomboToday()} required {...form.register("dateOfBirth")} {...meta("dateOfBirth")} />
+        <TextField
+          label={t("Start date")}
+          hint={t("When they started at the institute.")}
+          type="date"
+          required
+          {...form.register("startDate")} {...meta("startDate")}
+        />
         <SelectField label={t("Gender")} required {...form.register("gender")} {...meta("gender")}>
           <option value="">{t("Choose")}</option>
           <option value="female">{t("Female")}</option>

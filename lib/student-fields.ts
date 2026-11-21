@@ -75,6 +75,13 @@ export const studentSchema = z.object({
     .trim()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter the date of birth.")
     .refine((value) => value >= "1900-01-01" && value <= colomboToday(), "That date of birth is not right."),
+  // When they started at the institute. Fees still run from each course's own
+  // start, so a date in the past never creates arrears.
+  startDate: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter the start date.")
+    .refine((value) => value >= "1900-01-01", "That start date is not right."),
   // "" is what the form sends before a choice is made.
   gender: z.enum(["", "female", "male"]).refine((value) => value !== "", "Choose the gender."),
   nic: z
@@ -113,6 +120,7 @@ export const emptyStudent: StudentInput = {
   firstName: "",
   lastName: "",
   dateOfBirth: "",
+  startDate: "",
   gender: "",
   nic: "",
   religion: "",
@@ -153,6 +161,7 @@ export function studentRecord(values: StudentValues) {
     first_name: values.firstName,
     last_name: values.lastName,
     date_of_birth: values.dateOfBirth,
+    start_date: values.startDate,
     gender: values.gender,
     nic: nic.ok ? nic.value : "",
     religion: values.religion,
@@ -186,9 +195,11 @@ export type StudentRecord = ReturnType<typeof studentRecord>;
 // The same record for a direct table update: empty strings as null.
 export function studentColumns(values: StudentValues) {
   const record = studentRecord(values);
-  return Object.fromEntries(
+  const columns = Object.fromEntries(
     Object.entries(record).map(([key, value]) => [key, value === "" ? null : value]),
   ) as { [K in keyof StudentRecord]: StudentRecord[K] extends string ? string | null : StudentRecord[K] };
+  // Required by the schema, and never null in the database.
+  return { ...columns, start_date: record.start_date };
 }
 
 // A stored student, back into the form's shape.
@@ -197,6 +208,7 @@ export type StudentRow = {
   last_name: string | null;
   full_name: string;
   date_of_birth: string | null;
+  start_date: string | null;
   gender: string | null;
   nic: string | null;
   religion: string | null;
@@ -225,7 +237,7 @@ export type StudentRow = {
 };
 
 export const STUDENT_COLUMNS =
-  "first_name, last_name, full_name, date_of_birth, gender, nic, religion, address, phone, email, occupation, qualification, school, medium, ol_results, al_results, guardian_name, guardian_phone, guardian_occupation, father_name, father_occupation, mother_name, mother_occupation, emergency_contact_name, emergency_contact_phone, learning_mode, has_special_needs, special_needs, notes";
+  "first_name, last_name, full_name, date_of_birth, start_date, gender, nic, religion, address, phone, email, occupation, qualification, school, medium, ol_results, al_results, guardian_name, guardian_phone, guardian_occupation, father_name, father_occupation, mother_name, mother_occupation, emergency_contact_name, emergency_contact_phone, learning_mode, has_special_needs, special_needs, notes";
 
 // "+94771234567" -> "0771234567", the way people type it.
 function localPhone(value: string | null) {
@@ -237,6 +249,7 @@ export function studentInput(row: StudentRow): StudentInput {
     firstName: row.first_name ?? row.full_name,
     lastName: row.last_name ?? "",
     dateOfBirth: row.date_of_birth ?? "",
+    startDate: row.start_date ?? "",
     gender: row.gender === "female" || row.gender === "male" ? row.gender : "",
     nic: row.nic ?? "",
     religion: row.religion ?? "",

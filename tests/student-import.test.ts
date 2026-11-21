@@ -86,10 +86,13 @@ describe("readStudentSheet", () => {
       dateOfBirth: "2008-04-18",
       gender: "male",
       nic: "200812345678",
+      student: expect.objectContaining({ startDate: "2025-01-03" }),
       guardianPhone: "+94712345678",
       courseIds: ["c1"],
     });
     expect(sheet.rows[1].courseIds).toEqual(["c1", "c2"]);
+    // A blank start date means today.
+    expect(sheet.rows[1].student.startDate).toBe(today);
   });
 
   it("refuses the template's example rows so they are never imported", () => {
@@ -244,5 +247,20 @@ describe("readStudentSheet", () => {
       [true, "Hearing aid"],
       [false, ""],
     ]);
+  });
+});
+
+describe("start date column", () => {
+  it("reads Joined, Start date and the like, and flags a bad date", () => {
+    const sheet = readStudentSheet(
+      "First name,Date of birth,Gender,Joined\nNimal,18/04/2012,M,06/01/2025\nKamal,18/04/2012,M,soon\n",
+      options,
+    );
+    expect(sheet.ok).toBe(true);
+    if (!sheet.ok) return;
+    expect(sheet.rows[0].errors).toEqual([]);
+    expect(sheet.rows[0].student.startDate).toBe("2025-01-06");
+    expect(rowsToImport(sheet.rows, true)[0]).toMatchObject({ start_date: "2025-01-06" });
+    expect(sheet.rows[1].errors[0]).toContain('"soon" is not a start date');
   });
 });

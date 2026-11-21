@@ -17,6 +17,7 @@ const base = {
   firstName: "Nimal",
   lastName: "Perera",
   dateOfBirth: "2012-04-18",
+  startDate: "2025-01-06",
   gender: "male" as const,
 };
 
@@ -32,6 +33,13 @@ describe("studentSchema", () => {
     expect(studentSchema.safeParse({ ...base, dateOfBirth: "2999-01-01" }).error?.issues[0]?.message).toBe(
       "That date of birth is not right.",
     );
+  });
+
+  it("needs a start date, which may be in the future", () => {
+    expect(studentSchema.safeParse({ ...base, startDate: "" }).error?.issues[0]?.message).toBe("Enter the start date.");
+    expect(studentSchema.safeParse({ ...base, startDate: "1899-12-31" }).success).toBe(false);
+    expect(studentSchema.safeParse({ ...base, startDate: "2999-01-01" }).success).toBe(true);
+    expect(studentRecord(studentSchema.parse(base)).start_date).toBe("2025-01-06");
   });
 
   it("checks NIC, phones and email", () => {
@@ -92,10 +100,16 @@ describe("studentRecord", () => {
       first_name: "Nimal",
       last_name: "Perera",
       date_of_birth: "2012-04-18",
+      start_date: "2025-01-06",
       gender: "male",
       guardian_phone: "+94771234567",
       has_special_needs: false,
     } as StudentRow;
-    expect(studentInput(row)).toMatchObject({ firstName: "Nimal", lastName: "Perera", guardianPhone: "0771234567" });
+    expect(studentInput(row)).toMatchObject({
+      firstName: "Nimal",
+      lastName: "Perera",
+      startDate: "2025-01-06",
+      guardianPhone: "0771234567",
+    });
   });
 });

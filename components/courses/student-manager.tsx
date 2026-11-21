@@ -7,6 +7,7 @@ import { StudentAvatar } from "@/components/students/student-avatar";
 import { ConfirmDialog } from "@/components/ui/form-dialog";
 import { RowActions } from "@/components/ui/row-actions";
 import { archiveStudent } from "@/lib/actions/courses";
+import { formatDate } from "@/lib/dates";
 import { t } from "@/lib/t";
 
 export type ManagedStudent = {
@@ -15,6 +16,7 @@ export type ManagedStudent = {
   code?: string | null;
   photoUrl?: string | null;
   dateOfBirth?: string | null;
+  startDate?: string | null;
   gender?: string | null;
   guardianName: string | null;
   guardianPhone: string | null;
@@ -109,6 +111,7 @@ export function StudentManager({
                       {student.courses && student.courses.length > 0
                         ? ` · ${student.courses.map((course) => course.name).join(", ")}`
                         : ""}
+                      {student.startDate ? ` · ${t("Since")} ${formatDate(student.startDate)}` : ""}
                     </span>
                   ) : null}
                 </span>

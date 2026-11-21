@@ -249,7 +249,7 @@ function studentError(error: { code?: string; message: string } | null, fallback
     return t("Another student in this class already has that NIC. Check the number, or open that student instead.");
   }
   if (error?.code === "42703" || error?.code === "PGRST204" || error?.code === "PGRST202") {
-    return t("Student details are not set up yet. Run 023_student_details.sql in Supabase, then try again.");
+    return t("Student details are not up to date. Run the SQL files in supabase/sql up to 030_student_start_date.sql in Supabase, then try again.");
   }
   if (error?.message.includes("course not found")) {
     return t("One of those courses was deleted. Refresh the page and choose again.");

@@ -56,7 +56,7 @@ async function EditStudent({ params }: { params: Params }) {
     return (
       <p className="max-w-md text-slate">
         {error.code === "42703"
-          ? t("Student details are not set up yet. Run 023_student_details.sql in Supabase, then refresh.")
+          ? t("Student details are not up to date. Run the SQL files in supabase/sql up to 030_student_start_date.sql in Supabase, then refresh.")
           : t("This student could not be loaded. Refresh the page to try again.")}
       </p>
     );
